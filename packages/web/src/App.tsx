@@ -5,6 +5,10 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { LoginPage } from '@/pages/LoginPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ReservationsPage } from '@/pages/ReservationsPage';
+import { FloorPlanPage } from '@/pages/FloorPlanPage';
+import { GuestsPage } from '@/pages/GuestsPage';
+import { WaitlistPage } from '@/pages/WaitlistPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, initialized } = useAuthStore();
@@ -41,21 +45,12 @@ export default function App() {
         >
           <Route path="/" element={<DashboardPage />} />
           <Route path="/reservations" element={<ReservationsPage />} />
-          <Route path="/floor-plan" element={<Placeholder title="Tloris" desc="Floor plan editor - coming next" />} />
-          <Route path="/guests" element={<Placeholder title="Gosti" desc="Guest CRM - coming next" />} />
-          <Route path="/waitlist" element={<Placeholder title="Čakalna vrsta" desc="Waitlist management - coming next" />} />
-          <Route path="/settings" element={<Placeholder title="Nastavitve" desc="Restaurant settings - coming next" />} />
+          <Route path="/floor-plan" element={<FloorPlanPage />} />
+          <Route path="/guests" element={<GuestsPage />} />
+          <Route path="/waitlist" element={<WaitlistPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
-  );
-}
-
-function Placeholder({ title, desc }: { title: string; desc: string }) {
-  return (
-    <div className="p-8">
-      <h1 className="font-display text-2xl font-bold text-gray-900 mb-2">{title}</h1>
-      <p className="text-gray-500 text-sm">{desc}</p>
-    </div>
   );
 }

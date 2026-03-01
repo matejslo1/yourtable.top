@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/auth';
+import { Badge, Button } from '@/components/ui';
+import { NewReservationModal } from '@/components/reservations/NewReservationModal';
 
 interface Reservation {
   id: string;
@@ -9,7 +11,7 @@ interface Reservation {
   status: string;
   source: string;
   notes: string | null;
-  guest: { id: string; name: string; email: string; phone: string; tags: unknown; visitCount: number; noShowCount: number };
+  guest: { id: string; name: string; email: string; phone: string; tags: unknown; visitCount: number; noShowCount: number; isBlacklisted: boolean };
   tables: Array<{ table: { id: string; label: string } }>;
 }
 
@@ -18,14 +20,21 @@ interface TimelineSlot {
   reservations: Reservation[];
 }
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  HOLD: { label: 'Na čakanju', color: 'bg-yellow-100 text-yellow-700' },
-  PENDING: { label: 'V obdelavi', color: 'bg-blue-100 text-blue-700' },
-  CONFIRMED: { label: 'Potrjena', color: 'bg-green-100 text-green-700' },
-  SEATED: { label: 'Sedijo', color: 'bg-purple-100 text-purple-700' },
-  COMPLETED: { label: 'Zaključena', color: 'bg-gray-100 text-gray-600' },
-  CANCELLED: { label: 'Preklicana', color: 'bg-red-100 text-red-600' },
-  NO_SHOW: { label: 'Ni prišel', color: 'bg-red-100 text-red-700' },
+const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'purple' }> = {
+  HOLD: { label: 'Na čakanju', variant: 'warning' },
+  PENDING: { label: 'V obdelavi', variant: 'info' },
+  CONFIRMED: { label: 'Potrjena', variant: 'success' },
+  SEATED: { label: 'Sedijo', variant: 'purple' },
+  COMPLETED: { label: 'Zaključena', variant: 'default' },
+  CANCELLED: { label: 'Preklicana', variant: 'danger' },
+  NO_SHOW: { label: 'Ni prišel', variant: 'danger' },
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  online: '🌐 Online',
+  phone: '📞 Telefon',
+  walk_in: '🚶 Walk-in',
+  manual: '✍️ Ročno',
 };
 
 export function ReservationsPage() {
@@ -34,6 +43,7 @@ export function ReservationsPage() {
   const [stats, setStats] = useState<{ totalReservations: number; totalGuests: number; byStatus: Record<string, number> } | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
 
   const fetchTimeline = async () => {
     setLoading(true);
@@ -67,18 +77,8 @@ export function ReservationsPage() {
     }
   };
 
-  const prevDay = () => {
-    const d = new Date(date);
-    d.setDate(d.getDate() - 1);
-    setDate(d.toISOString().split('T')[0]);
-  };
-
-  const nextDay = () => {
-    const d = new Date(date);
-    d.setDate(d.getDate() + 1);
-    setDate(d.toISOString().split('T')[0]);
-  };
-
+  const prevDay = () => { const d = new Date(date); d.setDate(d.getDate() - 1); setDate(d.toISOString().split('T')[0]); };
+  const nextDay = () => { const d = new Date(date); d.setDate(d.getDate() + 1); setDate(d.toISOString().split('T')[0]); };
   const todayStr = new Date().toISOString().split('T')[0];
 
   return (
@@ -86,35 +86,29 @@ export function ReservationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-display text-2xl font-bold text-gray-900">Rezervacije</h1>
-        <div className="flex items-center gap-2">
-          <button onClick={prevDay} className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-500">‹</button>
-          <input
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-gray-200 text-sm"
-          />
-          <button onClick={nextDay} className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-500">›</button>
-          {date !== todayStr && (
-            <button onClick={() => setDate(todayStr)} className="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800">
-              Danes
-            </button>
-          )}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <button onClick={prevDay} className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-500">‹</button>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="px-3 py-2 rounded-lg border border-gray-200 text-sm" />
+            <button onClick={nextDay} className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-500">›</button>
+            {date !== todayStr && (
+              <Button variant="secondary" size="sm" onClick={() => setDate(todayStr)}>Danes</Button>
+            )}
+          </div>
+          <Button onClick={() => setNewOpen(true)}>+ Nova rezervacija</Button>
         </div>
       </div>
 
-      {/* Stats bar */}
+      {/* Stats */}
       {stats && (
-        <div className="flex items-center gap-6 mb-6 text-sm">
-          <span className="font-medium text-gray-900">{stats.totalReservations} rezervacij</span>
-          <span className="text-gray-400">·</span>
+        <div className="flex items-center gap-4 mb-6 text-sm flex-wrap">
+          <span className="font-semibold text-gray-900">{stats.totalReservations} rezervacij</span>
+          <span className="text-gray-300">·</span>
           <span className="text-gray-500">{stats.totalGuests} gostov</span>
           {Object.entries(stats.byStatus).map(([status, count]) => {
-            const info = STATUS_LABELS[status];
+            const info = STATUS_MAP[status];
             return info ? (
-              <span key={status} className={`px-2 py-0.5 rounded text-xs font-medium ${info.color}`}>
-                {count} {info.label.toLowerCase()}
-              </span>
+              <Badge key={status} variant={info.variant}>{count} {info.label.toLowerCase()}</Badge>
             ) : null;
           })}
         </div>
@@ -127,87 +121,66 @@ export function ReservationsPage() {
         </div>
       ) : slots.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
-          <p className="text-lg mb-1">Ni rezervacij za ta dan</p>
-          <p className="text-sm">Izberite drug datum ali ustvarite novo rezervacijo</p>
+          <span className="text-4xl block mb-4">📋</span>
+          <p className="text-lg font-medium text-gray-900 mb-1">Ni rezervacij</p>
+          <p className="text-sm mb-4">Za ta dan še ni rezervacij</p>
+          <Button onClick={() => setNewOpen(true)}>+ Nova rezervacija</Button>
         </div>
       ) : (
         <div className="space-y-1">
           {slots.map(slot => (
             <div key={slot.time} className="flex gap-4">
-              {/* Time label */}
               <div className="w-16 flex-shrink-0 pt-3">
                 <span className="font-display font-bold text-lg text-gray-900">{slot.time}</span>
               </div>
-
-              {/* Reservations */}
               <div className="flex-1 space-y-2 pb-4 border-l-2 border-gray-100 pl-4">
                 {slot.reservations.map(res => {
-                  const statusInfo = STATUS_LABELS[res.status] || { label: res.status, color: 'bg-gray-100 text-gray-600' };
-                  const isActive = ['CONFIRMED', 'PENDING'].includes(res.status);
+                  const statusInfo = STATUS_MAP[res.status] || { label: res.status, variant: 'default' as const };
                   const canSeat = res.status === 'CONFIRMED';
                   const canComplete = res.status === 'SEATED';
+                  const isActive = ['CONFIRMED', 'PENDING'].includes(res.status);
 
                   return (
                     <div key={res.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-sm transition-shadow">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <span className="font-medium text-gray-900">{res.guest.name}</span>
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusInfo.color}`}>
-                              {statusInfo.label}
-                            </span>
+                            <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+                            {res.guest.isBlacklisted && <Badge variant="danger">⛔ Črna lista</Badge>}
                             {res.guest.noShowCount > 0 && (
-                              <span className="px-1.5 py-0.5 rounded text-xs bg-red-50 text-red-600">
-                                {res.guest.noShowCount}× no-show
-                              </span>
+                              <span className="text-xs text-red-500">{res.guest.noShowCount}× no-show</span>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 text-sm text-gray-500">
-                            <span>{res.partySize} {res.partySize === 1 ? 'oseba' : res.partySize <= 4 ? 'osebe' : 'oseb'}</span>
-                            <span>·</span>
-                            <span>{res.tables.map(t => t.table.label).join(', ')}</span>
-                            <span>·</span>
-                            <span>{res.source}</span>
+                          <div className="flex items-center gap-2 text-sm text-gray-500 flex-wrap">
+                            <span>{res.partySize} {res.partySize <= 4 ? 'osebe' : 'oseb'}</span>
+                            <span className="text-gray-300">·</span>
+                            <span className="text-brand-600 font-medium">{res.tables.map(t => t.table.label).join(', ')}</span>
+                            <span className="text-gray-300">·</span>
+                            <span className="text-xs">{SOURCE_LABELS[res.source] || res.source}</span>
                           </div>
-                          {res.notes && <p className="text-xs text-gray-400 mt-1">{res.notes}</p>}
+                          {res.notes && <p className="text-xs text-gray-400 mt-1 italic">"{res.notes}"</p>}
                         </div>
 
-                        {/* Quick actions */}
-                        <div className="flex items-center gap-1.5 ml-4">
+                        <div className="flex items-center gap-1.5 ml-4 flex-shrink-0">
                           {canSeat && (
-                            <button
-                              onClick={() => updateStatus(res.id, 'SEATED')}
-                              disabled={actionLoading === res.id}
-                              className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-medium hover:bg-purple-700 disabled:opacity-50"
-                            >
+                            <Button size="sm" onClick={() => updateStatus(res.id, 'SEATED')} loading={actionLoading === res.id}>
                               Sedijo
-                            </button>
+                            </Button>
                           )}
                           {canComplete && (
-                            <button
-                              onClick={() => updateStatus(res.id, 'COMPLETED')}
-                              disabled={actionLoading === res.id}
-                              className="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-medium hover:bg-gray-800 disabled:opacity-50"
-                            >
+                            <Button size="sm" onClick={() => updateStatus(res.id, 'COMPLETED')} loading={actionLoading === res.id}>
                               Zaključi
-                            </button>
+                            </Button>
                           )}
                           {isActive && (
                             <>
-                              <button
-                                onClick={() => updateStatus(res.id, 'NO_SHOW')}
-                                disabled={actionLoading === res.id}
-                                className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                              >
+                              <Button variant="ghost" size="sm" onClick={() => updateStatus(res.id, 'NO_SHOW')} loading={actionLoading === res.id}>
                                 No-show
-                              </button>
-                              <button
-                                onClick={() => updateStatus(res.id, 'CANCELLED')}
-                                disabled={actionLoading === res.id}
-                                className="px-3 py-1.5 rounded-lg border border-red-200 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                              >
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => updateStatus(res.id, 'CANCELLED')} loading={actionLoading === res.id}>
                                 Prekliči
-                              </button>
+                              </Button>
                             </>
                           )}
                         </div>
@@ -220,6 +193,14 @@ export function ReservationsPage() {
           ))}
         </div>
       )}
+
+      {/* New reservation modal */}
+      <NewReservationModal
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        onCreated={fetchTimeline}
+        defaultDate={date}
+      />
     </div>
   );
 }

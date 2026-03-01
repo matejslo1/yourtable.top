@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --outDir dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

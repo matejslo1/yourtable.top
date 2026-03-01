@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from './prisma.js';
 
 interface AuditParams {
@@ -18,7 +19,7 @@ export async function createAuditLog(params: AuditParams) {
         action: params.action,
         entityType: params.entityType,
         entityId: params.entityId,
-        changes: params.changes ?? undefined,
+        changes: params.changes ? (params.changes as Prisma.InputJsonValue) : undefined,
       },
     });
   } catch (error) {

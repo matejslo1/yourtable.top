@@ -5,9 +5,7 @@
     "rootDir": "./src",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "target": "ES2022",
-    "composite": false,
-    "declaration": false
+    "target": "ES2022"
   },
   "include": ["src/**/*"]
 }

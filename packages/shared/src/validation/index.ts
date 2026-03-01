@@ -82,7 +82,20 @@ export const createTableSchema = z.object({
   path: ['maxSeats'],
 });
 
-export const updateTableSchema = createTableSchema.partial().omit({ floorPlanId: true } as any);
+export const updateTableSchema = z.object({
+  label: z.string().min(1).max(50).optional(),
+  minSeats: z.number().int().min(1).max(50).optional(),
+  maxSeats: z.number().int().min(1).max(50).optional(),
+  joinGroup: z.string().max(50).nullable().optional(),
+  joinPriority: z.number().int().min(0).optional(),
+  positionX: z.number().min(0).optional(),
+  positionY: z.number().min(0).optional(),
+  width: z.number().min(20).optional(),
+  height: z.number().min(20).optional(),
+  shape: z.enum(['square', 'round', 'rectangle']).optional(),
+  isCombinable: z.boolean().optional(),
+  isVip: z.boolean().optional(),
+});
 
 // ---- Table Adjacency ----
 
@@ -111,7 +124,7 @@ export const updateGuestSchema = createGuestSchema.partial();
 // ---- Reservation ----
 
 export const createReservationSchema = z.object({
-  guestId: z.string().uuid().optional(), // optional for walk-ins, will create guest
+  guestId: z.string().uuid().optional(),
   date: dateSchema,
   time: timeSchema,
   durationMinutes: z.number().int().min(15).max(480).default(90),
@@ -120,7 +133,7 @@ export const createReservationSchema = z.object({
   offerId: z.string().uuid().nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   internalNotes: z.string().max(2000).nullable().optional(),
-  tableIds: z.array(z.string().uuid()).optional(), // manual table assignment
+  tableIds: z.array(z.string().uuid()).optional(),
 });
 
 export const updateReservationSchema = z.object({
@@ -153,7 +166,6 @@ export const completeHoldSchema = z.object({
   guestPhone: z.string().max(50).optional(),
   notes: z.string().max(1000).optional(),
   sessionToken: z.string(),
-  // Stripe payment intent if deposit required
   paymentIntentId: z.string().optional(),
 });
 

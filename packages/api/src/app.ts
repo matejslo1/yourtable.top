@@ -9,6 +9,14 @@ import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
 import tenantRoutes from './routes/tenant.js';
 import userRoutes from './routes/users.js';
+import floorPlanRoutes from './routes/floorPlans.js';
+import tableStatusRoutes from './routes/tableStatus.js';
+import configRoutes from './routes/config.js';
+import publicBookingRoutes from './routes/publicBooking.js';
+import publicAvailabilityRoutes from './routes/publicAvailability.js';
+import reservationRoutes from './routes/reservations.js';
+import guestRoutes from './routes/guests.js';
+import waitlistRoutes from './routes/waitlist.js';
 
 const app = express();
 
@@ -16,10 +24,8 @@ const app = express();
 // Global Middleware
 // ============================================
 
-// Security headers
 app.use(helmet());
 
-// CORS
 app.use(cors({
   origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5173'],
   credentials: true,
@@ -27,21 +33,19 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Body parsing
 app.use(express.json({ limit: '10mb' }));
 
-// Logging
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('short'));
 }
 
 // Rate limiting
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // generous for development
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'TooManyRequests', message: 'Too many requests, please try again later', statusCode: 429 },
+  message: { error: 'TooManyRequests', message: 'Too many requests', statusCode: 429 },
 });
 
 const authLimiter = rateLimit({
@@ -49,11 +53,19 @@ const authLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'TooManyRequests', message: 'Too many auth attempts, please try again later', statusCode: 429 },
+});
+
+const holdLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'TooManyRequests', message: 'Too many booking attempts. Please wait a moment.', statusCode: 429 },
 });
 
 app.use('/api/', globalLimiter);
 app.use('/api/v1/auth/', authLimiter);
+app.use('/api/v1/public/', holdLimiter);
 
 // ============================================
 // Health Check
@@ -64,32 +76,34 @@ app.get('/health', (_req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     version: process.env.npm_package_version || '1.0.0',
+    phase: 3,
   });
 });
 
 // ============================================
-// API Routes (v1)
+// API Routes (v1) - Authenticated
 // ============================================
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/tenant', tenantRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/floor-plans', floorPlanRoutes);
+app.use('/api/v1/tables', tableStatusRoutes);
+app.use('/api/v1/config', configRoutes);
+app.use('/api/v1/reservations', reservationRoutes);
+app.use('/api/v1/guests', guestRoutes);
+app.use('/api/v1/waitlist', waitlistRoutes);
 
-// TODO Phase 2: Floor plans, tables, seating
-// app.use('/api/v1/floor-plans', floorPlanRoutes);
-// app.use('/api/v1/tables', tableRoutes);
+// ============================================
+// API Routes (v1) - Public (Booking Widget)
+// ============================================
 
-// TODO Phase 3: Reservations, guests
-// app.use('/api/v1/reservations', reservationRoutes);
-// app.use('/api/v1/guests', guestRoutes);
+app.use('/api/v1/public', publicBookingRoutes);
+app.use('/api/v1/public', publicAvailabilityRoutes);
 
-// TODO Phase 4: Public booking widget API
-// app.use('/api/v1/public/:tenantSlug', resolveTenant, publicRoutes);
-
-// TODO Phase 5: Payments, notifications, config
+// TODO Phase 5: Payments, notifications
 // app.use('/api/v1/payments', paymentRoutes);
 // app.use('/api/v1/notifications', notificationRoutes);
-// app.use('/api/v1/config', configRoutes);
 
 // ============================================
 // 404 Handler

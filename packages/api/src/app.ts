@@ -17,6 +17,7 @@ import publicAvailabilityRoutes from './routes/publicAvailability.js';
 import reservationRoutes from './routes/reservations.js';
 import guestRoutes from './routes/guests.js';
 import waitlistRoutes from './routes/waitlist.js';
+import paymentRoutes from './routes/payments.js';
 
 const app = express();
 
@@ -27,10 +28,10 @@ const app = express();
 app.use(helmet());
 
 app.use(cors({
-  origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5173'],
+  origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:5174'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature'],
 }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -76,7 +77,7 @@ app.get('/health', (_req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     version: process.env.npm_package_version || '1.0.0',
-    phase: 3,
+    phase: 5,
   });
 });
 
@@ -93,6 +94,7 @@ app.use('/api/v1/config', configRoutes);
 app.use('/api/v1/reservations', reservationRoutes);
 app.use('/api/v1/guests', guestRoutes);
 app.use('/api/v1/waitlist', waitlistRoutes);
+app.use('/api/v1/payments', paymentRoutes);
 
 // ============================================
 // API Routes (v1) - Public (Booking Widget)
@@ -101,12 +103,8 @@ app.use('/api/v1/waitlist', waitlistRoutes);
 app.use('/api/v1/public', publicBookingRoutes);
 app.use('/api/v1/public', publicAvailabilityRoutes);
 
-// TODO Phase 5: Payments, notifications
-// app.use('/api/v1/payments', paymentRoutes);
-// app.use('/api/v1/notifications', notificationRoutes);
-
 // ============================================
-// 404 Handler
+// 404 + Error Handler
 // ============================================
 
 app.use((_req, res) => {
@@ -116,10 +114,6 @@ app.use((_req, res) => {
     statusCode: 404,
   });
 });
-
-// ============================================
-// Error Handler (must be last)
-// ============================================
 
 app.use(errorHandler);
 

@@ -1,6 +1,7 @@
 import app from './app.js';
 import { prisma } from './utils/prisma.js';
 import { startHoldCleanupJob, stopHoldCleanupJob } from './jobs/holdCleanup.js';
+import { startReminderJob, stopReminderJob } from './jobs/reminderJob.js';
 import { cleanupExpiredOffers } from './services/waitlistService.js';
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -18,25 +19,27 @@ async function main() {
 
   // Start background jobs
   startHoldCleanupJob();
+  startReminderJob();
 
   // Waitlist offer cleanup (every 5 minutes)
   waitlistIntervalId = setInterval(async () => {
-    try {
-      await cleanupExpiredOffers();
-    } catch (error) {
-      console.error('[Cron] Waitlist cleanup failed:', error);
-    }
+    try { await cleanupExpiredOffers(); } catch (e) { console.error('[Cron] Waitlist cleanup failed:', e); }
   }, 5 * 60 * 1000);
   console.log('[Cron] Waitlist offer cleanup started (every 5min)');
 
   app.listen(PORT, () => {
     console.log(`
-╔══════════════════════════════════════════════╗
-║  🍽️  YourTable API Server                     ║
-║  Running on http://localhost:${PORT}             ║
-║  Environment: ${(process.env.NODE_ENV || 'development').padEnd(29)}║
-║  Phase: 3 (Reservations + Guests + Waitlist) ║
-╚══════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════╗
+║  🍽️  YourTable API Server                          ║
+║  Running on http://localhost:${PORT}                  ║
+║  Environment: ${(process.env.NODE_ENV || 'development').padEnd(35)}║
+║  Phase: 5 (Payments + Email Notifications)        ║
+║                                                   ║
+║  Cron jobs:                                       ║
+║    • HOLD cleanup      (every 60s)                ║
+║    • Reminder emails   (every 60min)              ║
+║    • Waitlist cleanup  (every 5min)               ║
+╚═══════════════════════════════════════════════════╝
     `);
   });
 }
@@ -44,6 +47,7 @@ async function main() {
 async function shutdown() {
   console.log('[Server] Shutting down...');
   stopHoldCleanupJob();
+  stopReminderJob();
   if (waitlistIntervalId) clearInterval(waitlistIntervalId);
   await prisma.$disconnect();
   process.exit(0);

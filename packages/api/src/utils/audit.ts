@@ -12,6 +12,9 @@ interface AuditParams {
 
 export async function createAuditLog(params: AuditParams) {
   try {
+    const changes: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue =
+      params.changes ?? Prisma.JsonNull;
+
     await prisma.auditLog.create({
       data: {
         tenantId: params.tenantId,
@@ -19,7 +22,7 @@ export async function createAuditLog(params: AuditParams) {
         action: params.action,
         entityType: params.entityType,
         entityId: params.entityId,
-        changes: (params.changes ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+        changes,
       },
     });
   } catch (error) {

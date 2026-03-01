@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "lint": "eslint src/",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm --filter @yourtable/shared build && tsc --noEmit",
     "test": "vitest run",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

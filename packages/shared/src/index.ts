@@ -1,3 +1,8 @@
+export type * from "./types/index.js";
+export { findOptimalTables, areTablesAvailable, getBlockingStatuses } from "./seating/engine.js";
+export type { TableInfo, AdjacencyInfo, SeatingRequest, TableCandidate } from "./seating/engine.js";
+
+
 import { z } from 'zod';
 
 // ---- Common ----
@@ -63,7 +68,7 @@ export const updateFloorPlanSchema = createFloorPlanSchema.partial();
 
 // ---- Table ----
 
-export const createTableSchema = z.object({
+const createTableBaseSchema = z.object({
   floorPlanId: z.string().uuid(),
   label: z.string().min(1).max(50),
   minSeats: z.number().int().min(1).max(50),
@@ -77,12 +82,14 @@ export const createTableSchema = z.object({
   shape: z.enum(['square', 'round', 'rectangle']).default('square'),
   isCombinable: z.boolean().default(false),
   isVip: z.boolean().default(false),
-}).refine(data => data.maxSeats >= data.minSeats, {
+});
+
+export const createTableSchema = createTableBaseSchema.refine(data => data.maxSeats >= data.minSeats, {
   message: 'maxSeats must be >= minSeats',
   path: ['maxSeats'],
 });
 
-export const updateTableSchema = createTableSchema.partial().omit({ floorPlanId: true } as any);
+export const updateTableSchema = createTableBaseSchema.partial().omit({ floorPlanId: true });
 
 // ---- Table Adjacency ----
 

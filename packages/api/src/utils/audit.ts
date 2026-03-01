@@ -19,7 +19,7 @@ export async function createAuditLog(params: AuditParams) {
         action: params.action,
         entityType: params.entityType,
         entityId: params.entityId,
-        changes: params.changes ? (params.changes as Prisma.InputJsonValue) : undefined,
+        changes: params.changes ? (params.changes as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     });
   } catch (error) {

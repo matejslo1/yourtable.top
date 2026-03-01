@@ -12,7 +12,7 @@
     "build:api": "pnpm --filter @yourtable/api build",
     "build:web": "pnpm --filter @yourtable/web build",
     "lint": "pnpm --parallel --filter './packages/*' lint",
-    "typecheck": "pnpm --parallel --filter './packages/*' typecheck",
+    "typecheck": "pnpm --filter @yourtable/shared build && pnpm --filter './packages/*' typecheck",
     "test": "pnpm --parallel --filter './packages/*' test",
     "db:generate": "pnpm --filter @yourtable/api db:generate",
     "db:push": "pnpm --filter @yourtable/api db:push",

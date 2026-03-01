@@ -23,7 +23,6 @@ export async function createAuditLog(params: AuditParams) {
       },
     });
   } catch (error) {
-    // Audit log should never break the main flow
     console.error('[AuditLog] Failed to create audit log:', error);
   }
 }

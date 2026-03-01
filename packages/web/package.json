@@ -1,0 +1,14 @@
+{
+  "name": "@yourtable/web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'Web dashboard - coming in Phase 2'",
+    "build": "echo 'Web dashboard - coming in Phase 2'",
+    "typecheck": "echo 'ok'"
+  },
+  "dependencies": {
+    "@yourtable/shared": "workspace:*"
+  }
+}

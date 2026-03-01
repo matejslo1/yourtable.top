@@ -1,0 +1,14 @@
+{
+  "name": "@yourtable/widget",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'Booking widget - coming in Phase 4'",
+    "build": "echo 'Booking widget - coming in Phase 4'",
+    "typecheck": "echo 'ok'"
+  },
+  "dependencies": {
+    "@yourtable/shared": "workspace:*"
+  }
+}

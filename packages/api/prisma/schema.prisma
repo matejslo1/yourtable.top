@@ -1,0 +1,526 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================
+// TENANT (Restaurant / Venue)
+// ============================================
+
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(255)
+  slug      String   @unique @db.VarChar(100)
+  address   String
+  phone     String?  @db.VarChar(50)
+  email     String   @db.VarChar(255)
+  timezone  String   @default("Europe/Ljubljana") @db.VarChar(50)
+  settings  Json     @default("{\"languages\":[\"sl\",\"en\"],\"currency\":\"EUR\",\"notificationsEnabled\":true,\"bookingWidgetEnabled\":true}")
+  stripeAccountId String? @db.VarChar(100) @map("stripe_account_id")
+  logoUrl   String?  @map("logo_url")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  users          User[]
+  floorPlans     FloorPlan[]
+  guests         Guest[]
+  reservations   Reservation[]
+  seatingConfig  SeatingConfig?
+  operatingHours OperatingHours[]
+  specialDates   SpecialDate[]
+  waitlist       WaitlistEntry[]
+  auditLogs      AuditLog[]
+  notifications  Notification[]
+  vouchers       Voucher[]
+
+  @@map("tenants")
+}
+
+// ============================================
+// USER (Staff / Admin)
+// ============================================
+
+model User {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  supabaseUserId  String   @unique @map("supabase_user_id")
+  email           String   @db.VarChar(255)
+  name            String   @db.VarChar(255)
+  role            UserRole @default(staff)
+  permissions     Json     @default("{}")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  auditLogs AuditLog[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([supabaseUserId])
+  @@map("users")
+}
+
+enum UserRole {
+  owner
+  admin
+  manager
+  staff
+}
+
+// ============================================
+// FLOOR PLAN
+// ============================================
+
+model FloorPlan {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  name         String   @db.VarChar(255)
+  layoutConfig Json     @default("{}") @map("layout_config")
+  isActive     Boolean  @default(true) @map("is_active")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tables RestaurantTable[]
+
+  @@index([tenantId])
+  @@map("floor_plans")
+}
+
+// ============================================
+// TABLE
+// ============================================
+
+model RestaurantTable {
+  id            String     @id @default(uuid()) @db.Uuid
+  floorPlanId   String     @map("floor_plan_id") @db.Uuid
+  label         String     @db.VarChar(50)
+  minSeats      Int        @map("min_seats")
+  maxSeats      Int        @map("max_seats")
+  joinGroup     String?    @map("join_group") @db.VarChar(50)
+  joinPriority  Int        @default(0) @map("join_priority")
+  positionX     Float      @map("position_x")
+  positionY     Float      @map("position_y")
+  width         Float      @default(80)
+  height        Float      @default(80)
+  shape         TableShape @default(square)
+  isCombinable  Boolean    @default(false) @map("is_combinable")
+  isVip         Boolean    @default(false) @map("is_vip")
+  isActive      Boolean    @default(true) @map("is_active")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  floorPlan     FloorPlan            @relation(fields: [floorPlanId], references: [id], onDelete: Cascade)
+  reservations  ReservationTable[]
+  adjacencyA    TableAdjacency[]     @relation("adjacencyA")
+  adjacencyB    TableAdjacency[]     @relation("adjacencyB")
+
+  @@unique([floorPlanId, label])
+  @@index([floorPlanId])
+  @@map("restaurant_tables")
+}
+
+enum TableShape {
+  square
+  round
+  rectangle
+}
+
+// ============================================
+// TABLE ADJACENCY (Join Rules)
+// ============================================
+
+model TableAdjacency {
+  tableAId     String  @map("table_a_id") @db.Uuid
+  tableBId     String  @map("table_b_id") @db.Uuid
+  canJoin      Boolean @default(true) @map("can_join")
+  joinMaxSeats Int?    @map("join_max_seats")
+
+  // Relations
+  tableA RestaurantTable @relation("adjacencyA", fields: [tableAId], references: [id], onDelete: Cascade)
+  tableB RestaurantTable @relation("adjacencyB", fields: [tableBId], references: [id], onDelete: Cascade)
+
+  @@id([tableAId, tableBId])
+  @@map("table_adjacency")
+}
+
+// ============================================
+// GUEST
+// ============================================
+
+model Guest {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  name          String   @db.VarChar(255)
+  email         String?  @db.VarChar(255)
+  phone         String?  @db.VarChar(50)
+  tags          Json     @default("[]")
+  notes         String?
+  visitCount    Int      @default(0) @map("visit_count")
+  noShowCount   Int      @default(0) @map("no_show_count")
+  isBlacklisted Boolean  @default(false) @map("is_blacklisted")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant       Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+  waitlist     WaitlistEntry[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([tenantId, phone])
+  @@map("guests")
+}
+
+// ============================================
+// RESERVATION
+// ============================================
+
+model Reservation {
+  id                 String            @id @default(uuid()) @db.Uuid
+  tenantId           String            @map("tenant_id") @db.Uuid
+  guestId            String            @map("guest_id") @db.Uuid
+  date               DateTime          @db.Date
+  time               String            @db.VarChar(5) // HH:mm
+  durationMinutes    Int               @map("duration_minutes")
+  partySize          Int               @map("party_size")
+  status             ReservationStatus @default(HOLD)
+  source             ReservationSource @default(manual)
+  offerId            String?           @map("offer_id") @db.Uuid
+  notes              String?
+  internalNotes      String?           @map("internal_notes")
+  tags               Json              @default("[]")
+  paymentStatus      PaymentStatus     @default(none) @map("payment_status")
+  paymentIntentId    String?           @map("payment_intent_id") @db.VarChar(255)
+  cancellationFee    Decimal?          @map("cancellation_fee") @db.Decimal(10, 2)
+  cancellationReason String?           @map("cancellation_reason")
+  holdExpiresAt      DateTime?         @map("hold_expires_at")
+  holdSessionToken   String?           @map("hold_session_token") @db.VarChar(100)
+  version            Int               @default(1)
+  assignedBy         AssignedBy        @default(auto) @map("assigned_by")
+  noShowFeeCharged   Boolean           @default(false) @map("no_show_fee_charged")
+  sourceIp           String?           @map("source_ip") @db.VarChar(45)
+  confirmedAt        DateTime?         @map("confirmed_at")
+  cancelledAt        DateTime?         @map("cancelled_at")
+  reminderSentAt     DateTime?         @map("reminder_sent_at")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  guest         Guest              @relation(fields: [guestId], references: [id])
+  tables        ReservationTable[]
+  notifications Notification[]
+
+  @@index([tenantId, date])
+  @@index([tenantId, status])
+  @@index([holdExpiresAt])
+  @@index([guestId])
+  @@map("reservations")
+}
+
+enum ReservationStatus {
+  HOLD
+  PENDING
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  EXPIRED
+  ABANDONED
+}
+
+enum ReservationSource {
+  online
+  walk_in
+  phone
+  manual
+}
+
+enum PaymentStatus {
+  none
+  deposit
+  paid
+  refunded
+}
+
+enum AssignedBy {
+  auto
+  manual
+}
+
+// ============================================
+// RESERVATION <-> TABLE (Many-to-Many)
+// ============================================
+
+model ReservationTable {
+  reservationId String @map("reservation_id") @db.Uuid
+  tableId       String @map("table_id") @db.Uuid
+
+  reservation Reservation     @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  table       RestaurantTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@id([reservationId, tableId])
+  @@index([tableId])
+  @@map("reservation_tables")
+}
+
+// ============================================
+// SEATING CONFIG (Per-Tenant)
+// ============================================
+
+model SeatingConfig {
+  tenantId            String @id @map("tenant_id") @db.Uuid
+  holdTtlSeconds      Int    @default(420) @map("hold_ttl_seconds") // 7 min
+  maxJoinTables       Int    @default(3) @map("max_join_tables")
+  autoConfirm         Boolean @default(true) @map("auto_confirm")
+  noShowTimeoutMin    Int    @default(15) @map("no_show_timeout_min")
+  cancellationFeeHours Int   @default(24) @map("cancellation_fee_hours")
+  scoringWeights      Json   @default("{\"waste\":1.0,\"join\":1.0,\"vip\":1.0,\"zone\":0.5}") @map("scoring_weights")
+  defaultDurationMin  Int    @default(90) @map("default_duration_min")
+  maxPartySize        Int    @default(12) @map("max_party_size")
+  minAdvanceHours     Int    @default(2) @map("min_advance_hours")
+  maxAdvanceDays      Int    @default(60) @map("max_advance_days")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("seating_config")
+}
+
+// ============================================
+// OPERATING HOURS
+// ============================================
+
+model OperatingHours {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  dayOfWeek       Int      @map("day_of_week") // 0=Mon, 6=Sun
+  openTime        String   @map("open_time") @db.VarChar(5)
+  closeTime       String   @map("close_time") @db.VarChar(5)
+  lastReservation String   @map("last_reservation") @db.VarChar(5)
+  isClosed        Boolean  @default(false) @map("is_closed")
+  slotDurationMin Int      @default(30) @map("slot_duration_min")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dayOfWeek])
+  @@index([tenantId])
+  @@map("operating_hours")
+}
+
+// ============================================
+// SPECIAL DATES
+// ============================================
+
+model SpecialDate {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  date        DateTime @db.Date
+  isClosed    Boolean  @default(false) @map("is_closed")
+  customHours Json?    @map("custom_hours")
+  note        String?  @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, date])
+  @@index([tenantId])
+  @@map("special_dates")
+}
+
+// ============================================
+// WAITLIST
+// ============================================
+
+model WaitlistEntry {
+  id        String         @id @default(uuid()) @db.Uuid
+  tenantId  String         @map("tenant_id") @db.Uuid
+  guestId   String         @map("guest_id") @db.Uuid
+  date      DateTime       @db.Date
+  time      String         @db.VarChar(5)
+  partySize Int            @map("party_size")
+  status    WaitlistStatus @default(waiting)
+  priority  Int            @default(0)
+  offeredAt DateTime?      @map("offered_at")
+  expiresAt DateTime?      @map("expires_at")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  guest  Guest  @relation(fields: [guestId], references: [id])
+
+  @@index([tenantId, date])
+  @@index([tenantId, status])
+  @@map("waitlist")
+}
+
+enum WaitlistStatus {
+  waiting
+  offered
+  accepted
+  expired
+}
+
+// ============================================
+// NOTIFICATION
+// ============================================
+
+model Notification {
+  id            String             @id @default(uuid()) @db.Uuid
+  tenantId      String             @map("tenant_id") @db.Uuid
+  reservationId String?            @map("reservation_id") @db.Uuid
+  type          NotificationType
+  channel       NotificationChannel
+  recipient     String             @db.VarChar(255)
+  status        NotificationDeliveryStatus @default(pending)
+  sentAt        DateTime?          @map("sent_at")
+  templateData  Json?              @map("template_data")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reservation Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([reservationId])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  confirmation
+  reminder
+  cancellation
+  review_request
+  waitlist_offer
+}
+
+enum NotificationChannel {
+  email
+  sms
+}
+
+enum NotificationDeliveryStatus {
+  pending
+  sent
+  failed
+  delivered
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String   @db.VarChar(100)
+  entityType String   @map("entity_type") @db.VarChar(100)
+  entityId   String   @map("entity_id") @db.Uuid
+  changes    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+// ============================================
+// VOUCHER (V2 Module - schema ready)
+// ============================================
+
+model Voucher {
+  id               String        @id @default(uuid()) @db.Uuid
+  tenantId         String        @map("tenant_id") @db.Uuid
+  code             String        @db.VarChar(50)
+  name             String        @db.VarChar(255)
+  initialValue     Decimal       @map("initial_value") @db.Decimal(10, 2)
+  remainingValue   Decimal       @map("remaining_value") @db.Decimal(10, 2)
+  status           VoucherStatus @default(active)
+  type             VoucherType   @default(digital)
+  deliveryMethod   DeliveryMethod @default(email) @map("delivery_method")
+  dedication       String?
+  recipientName    String?       @map("recipient_name") @db.VarChar(255)
+  recipientEmail   String?       @map("recipient_email") @db.VarChar(255)
+  recipientPhone   String?       @map("recipient_phone") @db.VarChar(50)
+  recipientAddress String?       @map("recipient_address")
+  buyerName        String        @map("buyer_name") @db.VarChar(255)
+  buyerEmail       String        @map("buyer_email") @db.VarChar(255)
+  pdfUrl           String?       @map("pdf_url")
+  qrCode           String?       @map("qr_code")
+  paymentIntentId  String?       @map("payment_intent_id") @db.VarChar(255)
+  validFrom        DateTime      @map("valid_from") @db.Date
+  validUntil       DateTime      @map("valid_until") @db.Date
+  orderId          String?       @map("order_id") @db.VarChar(50)
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions VoucherTransaction[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("vouchers")
+}
+
+enum VoucherStatus {
+  active
+  used
+  expired
+  cancelled
+}
+
+enum VoucherType {
+  digital
+  physical
+}
+
+enum DeliveryMethod {
+  email
+  print
+  pickup
+  delivery
+}
+
+model VoucherTransaction {
+  id          String   @id @default(uuid()) @db.Uuid
+  voucherId   String   @map("voucher_id") @db.Uuid
+  amount      Decimal  @db.Decimal(10, 2)
+  type        VoucherTransactionType
+  performedBy String?  @map("performed_by") @db.Uuid
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  voucher Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@index([voucherId])
+  @@map("voucher_transactions")
+}
+
+enum VoucherTransactionType {
+  purchase
+  redemption
+  refund
+}

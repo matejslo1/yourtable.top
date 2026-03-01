@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YourTable Widget - Dev</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+    .demo-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .demo-header h1 {
+      font-size: 24px;
+      color: #111827;
+      margin-bottom: 8px;
+    }
+    .demo-header p {
+      color: #6b7280;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-header">
+    <h1>🍽️ YourTable Booking Widget</h1>
+    <p>Development preview — tenant: demo-restavracija</p>
+  </div>
+
+  <div id="widget-root"></div>
+
+  <script type="module">
+    import { BookingWidget } from './src/components/BookingWidget';
+    import React from 'react';
+    import ReactDOM from 'react-dom/client';
+    import './src/styles.css';
+
+    const root = ReactDOM.createRoot(document.getElementById('widget-root'));
+    root.render(
+      React.createElement(BookingWidget, {
+        tenantSlug: 'demo-restavracija',
+        theme: 'light'
+      })
+    );
+  </script>
+</body>
+</html>

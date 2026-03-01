@@ -7,14 +7,11 @@ interface AuditParams {
   action: 'create' | 'update' | 'delete' | 'status_change';
   entityType: string;
   entityId: string;
-  changes?: Record<string, unknown> | null;
+  changes?: Prisma.InputJsonValue | null;
 }
 
 export async function createAuditLog(params: AuditParams) {
   try {
-    const changes: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue =
-      params.changes ?? Prisma.JsonNull;
-
     await prisma.auditLog.create({
       data: {
         tenantId: params.tenantId,
@@ -22,7 +19,7 @@ export async function createAuditLog(params: AuditParams) {
         action: params.action,
         entityType: params.entityType,
         entityId: params.entityId,
-        changes,
+        changes: params.changes ?? Prisma.JsonNull,
       },
     });
   } catch (error) {

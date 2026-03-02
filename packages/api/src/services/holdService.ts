@@ -398,7 +398,9 @@ export async function cleanupExpiredHolds() {
       // Delete placeholder guest (only if it's a placeholder)
       const guest = await tx.guest.findUnique({ where: { id: hold.guestId } });
       if (guest?.email?.includes('@placeholder.local')) {
-        await tx.guest.delete({ where: { id: hold.guestId } }).catch(() => {});
+        // Delete any reservations referencing this guest first to avoid FK violation
+        await tx.reservation.deleteMany({ where: { guestId: hold.guestId } });
+        await tx.guest.delete({ where: { id: hold.guestId } });
       }
     });
   }

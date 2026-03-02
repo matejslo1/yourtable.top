@@ -42,6 +42,12 @@ export function FloorPlanPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({ label: '', minSeats: '2', maxSeats: '4', shape: 'square', isVip: false, isCombinable: false, joinGroup: '' });
   const [addLoading, setAddLoading] = useState(false);
+  
+  // New floor plan modal state
+  const [newPlanOpen, setNewPlanOpen] = useState(false);
+  const [newPlanName, setNewPlanName] = useState('');
+  const [newPlanLoading, setNewPlanLoading] = useState(false);
+  
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const fetchFloorPlans = async () => {
@@ -49,10 +55,10 @@ export function FloorPlanPage() {
     try {
       const res = await apiFetch<{ data: FloorPlan[] }>('/api/v1/floor-plans');
       setFloorPlans(res.data);
-      if (res.data.length > 0 && !activePlan) {
-        setActivePlan(res.data[0].id);
-        // Fetch with adjacency
-        const detail = await apiFetch<{ data: FloorPlan & { adjacency: Adjacency[] } }>(`/api/v1/floor-plans/${res.data[0].id}`);
+      if (res.data.length > 0) {
+        const planId = activePlan && res.data.find(p => p.id === activePlan) ? activePlan : res.data[0].id;
+        setActivePlan(planId);
+        const detail = await apiFetch<{ data: FloorPlan & { adjacency: Adjacency[] } }>(`/api/v1/floor-plans/${planId}`);
         setAdjacency(detail.data.adjacency || []);
       }
     } catch (err) { console.error(err); }
@@ -71,6 +77,32 @@ export function FloorPlanPage() {
 
   const currentPlan = floorPlans.find(p => p.id === activePlan);
   const tables = currentPlan?.tables || [];
+
+  // Create new floor plan
+  const createFloorPlan = async () => {
+    if (!newPlanName.trim()) return;
+    setNewPlanLoading(true);
+    try {
+      await apiFetch('/api/v1/floor-plans', {
+        method: 'POST',
+        body: JSON.stringify({ name: newPlanName.trim() }),
+      });
+      setNewPlanOpen(false);
+      setNewPlanName('');
+      await fetchFloorPlans();
+    } catch (err: any) { alert(err.message); }
+    finally { setNewPlanLoading(false); }
+  };
+
+  // Delete floor plan
+  const deleteFloorPlan = async (id: string) => {
+    if (!confirm('Ste prepričani da želite izbrisati ta tloris?')) return;
+    try {
+      await apiFetch(`/api/v1/floor-plans/${id}`, { method: 'DELETE' });
+      setActivePlan(null);
+      await fetchFloorPlans();
+    } catch (err: any) { alert(err.message); }
+  };
 
   // Drag handlers
   const handleMouseDown = (e: React.MouseEvent, table: Table) => {
@@ -142,14 +174,25 @@ export function FloorPlanPage() {
     finally { setAddLoading(false); }
   };
 
-  // Table shape renderer
+  // Delete table
+  const deleteTable = async (tableId: string) => {
+    if (!activePlan || !confirm('Izbrisati to mizo?')) return;
+    try {
+      await apiFetch(`/api/v1/floor-plans/${activePlan}/tables/${tableId}`, { method: 'DELETE' });
+      setEditOpen(false);
+      setSelectedTable(null);
+      fetchFloorPlans();
+    } catch (err: any) { alert(err.message); }
+  };
+
+  // Table shape style
   const getTableStyle = (t: Table): React.CSSProperties => ({
     position: 'absolute',
     left: t.positionX,
     top: t.positionY,
     width: t.width,
-    height: t.height,
-    borderRadius: t.shape === 'round' ? '50%' : t.shape === 'rectangle' ? '12px' : '12px',
+    height: t.shape === 'rectangle' ? t.height * 0.6 : t.height,
+    borderRadius: t.shape === 'round' ? '50%' : '12px',
     cursor: dragging?.id === t.id ? 'grabbing' : 'grab',
     transition: dragging?.id === t.id ? 'none' : 'box-shadow 0.15s',
   });
@@ -163,13 +206,14 @@ export function FloorPlanPage() {
           <p className="text-sm text-gray-500 mt-0.5">Povlecite mize za premikanje, kliknite za urejanje</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setNewPlanOpen(true)}>+ Nov tloris</Button>
           {activePlan && <Button onClick={() => setAddOpen(true)}>+ Dodaj mizo</Button>}
         </div>
       </div>
 
       {/* Floor plan tabs */}
       {floorPlans.length > 0 && (
-        <div className="flex gap-1 mb-4 flex-shrink-0">
+        <div className="flex gap-1 mb-4 flex-shrink-0 items-center">
           {floorPlans.map(fp => (
             <button
               key={fp.id}
@@ -181,13 +225,29 @@ export function FloorPlanPage() {
               {fp.name} <span className="text-xs opacity-60">({fp.tables.length})</span>
             </button>
           ))}
+          {activePlan && (
+            <button
+              onClick={() => deleteFloorPlan(activePlan)}
+              className="ml-2 text-xs text-red-400 hover:text-red-600 transition-colors"
+              title="Izbriši tloris"
+            >
+              🗑️
+            </button>
+          )}
         </div>
       )}
 
       {loading ? (
         <div className="flex-1 bg-gray-100 rounded-xl animate-pulse" />
+      ) : floorPlans.length === 0 ? (
+        <EmptyState
+          icon="🗺️"
+          title="Ni tlorisov"
+          description="Ustvarite prvi tloris za vašo restavracijo"
+          action={{ label: '+ Nov tloris', onClick: () => setNewPlanOpen(true) }}
+        />
       ) : !currentPlan ? (
-        <EmptyState icon="🗺️" title="Ni tlorisov" description="Ustvarite prvi tloris za vašo restavracijo" />
+        <EmptyState icon="🗺️" title="Izberite tloris" />
       ) : (
         /* Canvas */
         <div
@@ -268,6 +328,7 @@ export function FloorPlanPage() {
               {selectedTable.joinGroup && <Badge variant="default">Skupina: {selectedTable.joinGroup}</Badge>}
             </div>
             <div className="flex gap-2 pt-2">
+              <Button variant="danger" size="sm" onClick={() => deleteTable(selectedTable.id)}>Izbriši mizo</Button>
               <Button variant="secondary" onClick={() => setEditOpen(false)} className="flex-1">Zapri</Button>
             </div>
           </div>
@@ -306,6 +367,23 @@ export function FloorPlanPage() {
           <div className="flex gap-3 pt-2">
             <Button variant="secondary" onClick={() => setAddOpen(false)} className="flex-1">Prekliči</Button>
             <Button onClick={addTable} loading={addLoading} className="flex-[2]">Dodaj mizo</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* New floor plan modal */}
+      <Modal open={newPlanOpen} onClose={() => setNewPlanOpen(false)} title="Nov tloris">
+        <div className="space-y-4">
+          <Input
+            label="Ime tlorisa *"
+            value={newPlanName}
+            onChange={e => setNewPlanName(e.target.value)}
+            placeholder="npr. Notranjost, Terasa, VIP soba"
+            onKeyDown={e => { if (e.key === 'Enter') createFloorPlan(); }}
+          />
+          <div className="flex gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setNewPlanOpen(false)} className="flex-1">Prekliči</Button>
+            <Button onClick={createFloorPlan} loading={newPlanLoading} className="flex-[2]">Ustvari tloris</Button>
           </div>
         </div>
       </Modal>

@@ -2,6 +2,7 @@ import app from './app.js';
 import { prisma } from './utils/prisma.js';
 import { startHoldCleanupJob, stopHoldCleanupJob } from './jobs/holdCleanup.js';
 import { startReminderJob, stopReminderJob } from './jobs/reminderJob.js';
+import { startVoucherExpiryJob, stopVoucherExpiryJob } from './jobs/voucherExpiryJob.js';
 import { cleanupExpiredOffers } from './services/waitlistService.js';
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -20,6 +21,7 @@ async function main() {
   // Start background jobs
   startHoldCleanupJob();
   startReminderJob();
+  startVoucherExpiryJob();
 
   // Waitlist offer cleanup (every 5 minutes)
   waitlistIntervalId = setInterval(async () => {
@@ -33,12 +35,13 @@ async function main() {
 ║  🍽️  YourTable API Server                          ║
 ║  Running on http://localhost:${PORT}                  ║
 ║  Environment: ${(process.env.NODE_ENV || 'development').padEnd(35)}║
-║  Phase: 5 (Payments + Email Notifications)        ║
+║  Phase: 6 (Gift Vouchers)                         ║
 ║                                                   ║
 ║  Cron jobs:                                       ║
 ║    • HOLD cleanup      (every 60s)                ║
 ║    • Reminder emails   (every 60min)              ║
 ║    • Waitlist cleanup  (every 5min)               ║
+║    • Voucher expiry    (every 6h)                 ║
 ╚═══════════════════════════════════════════════════╝
     `);
   });
@@ -48,6 +51,7 @@ async function shutdown() {
   console.log('[Server] Shutting down...');
   stopHoldCleanupJob();
   stopReminderJob();
+  stopVoucherExpiryJob();
   if (waitlistIntervalId) clearInterval(waitlistIntervalId);
   await prisma.$disconnect();
   process.exit(0);

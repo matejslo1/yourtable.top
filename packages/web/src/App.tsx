@@ -9,6 +9,7 @@ import { FloorPlanPage } from '@/pages/FloorPlanPage';
 import { GuestsPage } from '@/pages/GuestsPage';
 import { WaitlistPage } from '@/pages/WaitlistPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { VouchersPage } from '@/pages/VouchersPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, initialized } = useAuthStore();
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/floor-plan" element={<FloorPlanPage />} />
           <Route path="/guests" element={<GuestsPage />} />
           <Route path="/waitlist" element={<WaitlistPage />} />
+          <Route path="/vouchers" element={<VouchersPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

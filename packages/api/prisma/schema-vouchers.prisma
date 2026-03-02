@@ -1,0 +1,83 @@
+// ============================================
+// GIFT VOUCHERS - Add to schema.prisma
+// ============================================
+
+// Add after existing models:
+
+model Voucher {
+  id              String         @id @default(cuid())
+  tenantId        String
+  code            String         // Unique redemption code (e.g. YT-A3K9-XM2P)
+  type            VoucherType    // monetary / percentage / experience
+  status          VoucherStatus  @default(active)
+
+  // Value
+  originalValue   Decimal        @db.Decimal(10, 2) // Original amount (EUR or %)
+  remainingValue  Decimal        @db.Decimal(10, 2) // Remaining (for partial use)
+  currency        String         @default("EUR")
+
+  // Validity
+  validFrom       DateTime       @default(now())
+  validUntil      DateTime       // Expiry date
+  maxUses         Int            @default(1)
+  usedCount       Int            @default(0)
+
+  // Purchase info
+  purchaserName   String?
+  purchaserEmail  String?
+  recipientName   String?
+  recipientEmail  String?
+  message         String?        // Personal gift message
+
+  // Payment
+  paymentIntentId String?        // Stripe payment intent
+  paymentStatus   String?        @default("unpaid") // unpaid, paid, refunded
+
+  // Metadata
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  redemptions     VoucherRedemption[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([code])
+}
+
+model VoucherRedemption {
+  id            String      @id @default(cuid())
+  voucherId     String
+  tenantId      String
+  reservationId String?
+  guestId       String?
+  amount        Decimal     @db.Decimal(10, 2) // Amount redeemed
+  redeemedAt    DateTime    @default(now())
+  redeemedBy    String?     // Staff user ID
+
+  voucher       Voucher     @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reservation   Reservation? @relation(fields: [reservationId], references: [id])
+  guest         Guest?      @relation(fields: [guestId], references: [id])
+
+  @@index([voucherId])
+  @@index([tenantId])
+}
+
+enum VoucherType {
+  monetary    // Fixed EUR amount (e.g. 50 EUR)
+  percentage  // Discount percentage (e.g. 20%)
+  experience  // Specific experience (e.g. "Dinner for 2")
+}
+
+enum VoucherStatus {
+  active
+  redeemed    // Fully used
+  expired
+  cancelled
+}
+
+// NOTE: Also add these relations to existing models:
+// In Tenant model add:    vouchers  Voucher[]    voucherRedemptions  VoucherRedemption[]
+// In Reservation model add: voucherRedemptions VoucherRedemption[]
+// In Guest model add:       voucherRedemptions VoucherRedemption[]

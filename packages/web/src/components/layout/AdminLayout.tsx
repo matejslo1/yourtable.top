@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: '/floor-plan', label: 'Tloris', icon: '🗺️' },
   { to: '/guests', label: 'Gosti', icon: '👥' },
   { to: '/waitlist', label: 'Čakalna vrsta', icon: '⏳' },
+  { to: '/vouchers', label: 'Darilni boni', icon: '🎁' },
   { to: '/settings', label: 'Nastavitve', icon: '⚙️' },
 ];
 

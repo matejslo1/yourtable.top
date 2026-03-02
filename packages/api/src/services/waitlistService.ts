@@ -43,7 +43,7 @@ export async function addToWaitlist(params: {
   }
 
   // Check VIP status for priority
-  const guest = await prisma.guest.findUnique({ where: { id: guestId } });
+  const guest = await prisma.guest.findFirst({ where: { id: guestId, tenantId } });
   const isVip = Array.isArray(guest?.tags) && (guest.tags as string[]).includes('VIP');
 
   const entry = await prisma.waitlistEntry.create({

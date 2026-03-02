@@ -1,13 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
-
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  });
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+// Backwards-compatible re-export.
+// Keep a single PrismaClient instance configured in src/lib/prisma.ts.
+export { prisma } from '../lib/prisma.js';
+export { default } from '../lib/prisma.js';

@@ -126,7 +126,7 @@ export async function createReservation(params: CreateReservationParams) {
       }
     }
 
-    const guest = await prisma.guest.findUnique({ where: { id: guestId } });
+    const guest = await prisma.guest.findFirst({ where: { id: guestId, tenantId } });
     const isVip = Array.isArray(guest?.tags) && (guest.tags as string[]).includes('VIP');
 
     const candidates = findOptimalTables(availableTables, allAdjacency, {

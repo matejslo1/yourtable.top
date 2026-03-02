@@ -1,14 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { createClient } from '@supabase/supabase-js';
 import prisma from '../lib/prisma.js';
+import { supabasePublic } from '../utils/supabase.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
 
 // POST /api/v1/auth/login
 router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
@@ -19,7 +15,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       return;
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabasePublic.auth.signInWithPassword({ email, password });
     if (error || !data.session) {
       res.status(401).json({ error: 'Unauthorized', message: error?.message ?? 'Login failed', statusCode: 401 });
       return;
@@ -57,7 +53,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       return;
     }
 
-    const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
+    const { data, error } = await supabasePublic.auth.refreshSession({ refresh_token: refreshToken });
     if (error || !data.session) {
       res.status(401).json({ error: 'Unauthorized', message: 'Token refresh failed', statusCode: 401 });
       return;
@@ -104,7 +100,7 @@ router.get('/me', requireAuth, async (req: AuthRequest, res: Response, next: Nex
 // POST /api/v1/auth/logout
 router.post('/logout', requireAuth, async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    await supabase.auth.signOut();
+    
     res.status(200).json({ success: true });
   } catch (err) {
     next(err);

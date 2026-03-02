@@ -4,6 +4,7 @@ export class AppError extends Error {
 
   constructor(message: string, statusCode: number = 400, details?: Record<string, string[]>) {
     super(message);
+    this.name = this.constructor.name;
     this.statusCode = statusCode;
     this.details = details;
     Object.setPrototypeOf(this, AppError.prototype);

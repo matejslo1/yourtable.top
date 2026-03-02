@@ -238,6 +238,48 @@ router.post(
 );
 
 /**
+ * PUT /api/v1/floor-plans/:id/tables/batch
+ * Batch update table positions (drag & drop from floor editor)
+ */
+router.put(
+  '/:id/tables/batch',
+  requireRole('owner', 'admin', 'manager'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tables } = req.body;
+      if (!Array.isArray(tables) || tables.length === 0) {
+        throw new AppError('tables array is required', 400);
+      }
+
+      // Verify floor plan
+      const floorPlan = await prisma.floorPlan.findFirst({
+        where: { id: req.params.id, tenantId: req.tenantId! },
+      });
+      if (!floorPlan) throw new NotFoundError('FloorPlan', req.params.id);
+
+      // Batch update in transaction
+      const results = await prisma.$transaction(
+        tables.map((t: { id: string; positionX?: number; positionY?: number; width?: number; height?: number }) =>
+          prisma.restaurantTable.update({
+            where: { id: t.id },
+            data: {
+              ...(t.positionX !== undefined && { positionX: t.positionX }),
+              ...(t.positionY !== undefined && { positionY: t.positionY }),
+              ...(t.width !== undefined && { width: t.width }),
+              ...(t.height !== undefined && { height: t.height }),
+            },
+          })
+        )
+      );
+
+      res.json({ data: results });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * PUT /api/v1/floor-plans/:floorPlanId/tables/:tableId
  * Update table (position, capacity, shape, etc.)
  */
@@ -308,48 +350,6 @@ router.delete(
       });
 
       res.json({ data: { message: 'Table deactivated' } });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * PUT /api/v1/floor-plans/:id/tables/batch
- * Batch update table positions (drag & drop from floor editor)
- */
-router.put(
-  '/:id/tables/batch',
-  requireRole('owner', 'admin', 'manager'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { tables } = req.body;
-      if (!Array.isArray(tables) || tables.length === 0) {
-        throw new AppError('tables array is required', 400);
-      }
-
-      // Verify floor plan
-      const floorPlan = await prisma.floorPlan.findFirst({
-        where: { id: req.params.id, tenantId: req.tenantId! },
-      });
-      if (!floorPlan) throw new NotFoundError('FloorPlan', req.params.id);
-
-      // Batch update in transaction
-      const results = await prisma.$transaction(
-        tables.map((t: { id: string; positionX?: number; positionY?: number; width?: number; height?: number }) =>
-          prisma.restaurantTable.update({
-            where: { id: t.id },
-            data: {
-              ...(t.positionX !== undefined && { positionX: t.positionX }),
-              ...(t.positionY !== undefined && { positionY: t.positionY }),
-              ...(t.width !== undefined && { width: t.width }),
-              ...(t.height !== undefined && { height: t.height }),
-            },
-          })
-        )
-      );
-
-      res.json({ data: results });
     } catch (error) {
       next(error);
     }

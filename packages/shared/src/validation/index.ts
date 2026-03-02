@@ -162,7 +162,7 @@ export const createHoldSchema = z.object({
 
 export const completeHoldSchema = z.object({
   guestName: z.string().min(1).max(255),
-  guestEmail: z.string().email(),
+  guestEmail: z.string().email().or(z.string().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Invalid email address')),
   guestPhone: z.string().max(50).optional(),
   notes: z.string().max(1000).optional(),
   sessionToken: z.string(),

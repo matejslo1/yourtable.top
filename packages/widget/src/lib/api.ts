@@ -19,7 +19,10 @@ async function api<T>(tenantSlug: string, path: string, options: ApiOptions = {}
   const json = await res.json();
 
   if (!res.ok) {
-    throw new Error(json.message || `API error: ${res.status}`);
+    const details = json.details
+      ? Object.entries(json.details).map(([field, msgs]) => `${field}: ${(msgs as string[]).join(', ')}`).join('; ')
+      : null;
+    throw new Error(details || json.message || `API error: ${res.status}`);
   }
 
   return json.data;

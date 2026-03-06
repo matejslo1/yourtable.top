@@ -15,8 +15,8 @@ export function PartySizeSelector({ value, onChange, min = 1, max = 12 }: PartyS
           yt-w-10 yt-h-10 yt-rounded-full yt-flex yt-items-center yt-justify-center
           yt-border yt-transition-all yt-duration-150 yt-text-lg yt-font-medium
           ${value <= min
-            ? 'yt-border-surface-200 yt-text-surface-300 yt-cursor-not-allowed'
-            : 'yt-border-surface-300 yt-text-surface-600 hover:yt-border-brand-400 hover:yt-text-brand-600 hover:yt-bg-brand-50'
+            ? 'yt-border-gray-200 yt-text-gray-300 yt-cursor-not-allowed'
+            : 'yt-border-gray-300 yt-text-gray-600 hover:yt-border-emerald-400 hover:yt-text-emerald-600 hover:yt-bg-emerald-50'
           }
         `}
       >
@@ -24,10 +24,8 @@ export function PartySizeSelector({ value, onChange, min = 1, max = 12 }: PartyS
       </button>
 
       <div className="yt-flex yt-flex-col yt-items-center yt-min-w-[60px]">
-        <span className="yt-text-2xl yt-font-display yt-font-bold yt-text-surface-900">
-          {value}
-        </span>
-        <span className="yt-text-xs yt-text-surface-400 yt--mt-0.5">
+        <span className="yt-text-2xl yt-font-display yt-font-bold yt-text-gray-900">{value}</span>
+        <span className="yt-text-xs yt-text-gray-400 yt--mt-0.5">
           {value === 1 ? 'gost' : value <= 4 ? 'gostje' : 'gostov'}
         </span>
       </div>
@@ -39,8 +37,8 @@ export function PartySizeSelector({ value, onChange, min = 1, max = 12 }: PartyS
           yt-w-10 yt-h-10 yt-rounded-full yt-flex yt-items-center yt-justify-center
           yt-border yt-transition-all yt-duration-150 yt-text-lg yt-font-medium
           ${value >= max
-            ? 'yt-border-surface-200 yt-text-surface-300 yt-cursor-not-allowed'
-            : 'yt-border-surface-300 yt-text-surface-600 hover:yt-border-brand-400 hover:yt-text-brand-600 hover:yt-bg-brand-50'
+            ? 'yt-border-gray-200 yt-text-gray-300 yt-cursor-not-allowed'
+            : 'yt-border-gray-300 yt-text-gray-600 hover:yt-border-emerald-400 hover:yt-text-emerald-600 hover:yt-bg-emerald-50'
           }
         `}
       >

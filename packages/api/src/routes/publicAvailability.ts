@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma.js';
+import { getAvailability } from '../services/availability.js';
 
 const router = Router();
 
@@ -9,16 +10,12 @@ const AvailabilityQuerySchema = z.object({
   partySize: z.coerce.number().int().min(1).max(50),
 });
 
-// GET /:tenantSlug/availability
+// GET /:tenantSlug/availability — REAL availability with capacity checking
 router.get('/:tenantSlug/availability', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenant = await prisma.tenant.findUnique({
       where: { slug: req.params.tenantSlug },
-      include: {
-        seatingConfig: true,
-        operatingHours: true,
-        specialDates: true,
-      },
+      include: { seatingConfig: true },
     });
 
     if (!tenant || !tenant.isActive) {
@@ -33,45 +30,12 @@ router.get('/:tenantSlug/availability', async (req: Request, res: Response, next
     }
 
     const { date, partySize } = parsed.data;
-    const requestedDate = new Date(date);
-    const dayOfWeek = (requestedDate.getDay() + 6) % 7; // Mon=0 ... Sun=6
+    const requestedDate = new Date(`${date}T00:00:00`);
 
-    // Check special dates
-    const specialDate = tenant.specialDates.find(
-      (sd) => sd.date.toISOString().slice(0, 10) === date,
-    );
-    if (specialDate?.isClosed) {
-      res.status(200).json({ available: false, slots: [], reason: 'ClosedSpecialDate' });
-      return;
-    }
-
-    // Check operating hours
-    const hours = tenant.operatingHours.find((oh) => oh.dayOfWeek === dayOfWeek);
-    if (!hours || hours.isClosed) {
-      res.status(200).json({ available: false, slots: [], reason: 'ClosedDay' });
-      return;
-    }
-
-    // Generate time slots
-    const slots: string[] = [];
-    const [openH, openM] = hours.openTime.split(':').map(Number);
-    const [lastH, lastM] = hours.lastReservation.split(':').map(Number);
-    const slotMin = hours.slotDurationMin;
-
-    let current = openH * 60 + openM;
-    const lastSlot = lastH * 60 + lastM;
-
-    while (current <= lastSlot) {
-      const h = String(Math.floor(current / 60)).padStart(2, '0');
-      const m = String(current % 60).padStart(2, '0');
-      slots.push(`${h}:${m}`);
-      current += slotMin;
-    }
-
-    // Filter advance booking constraints
+    // Check advance booking limits
+    const now = new Date();
     const minAdvanceHours = tenant.seatingConfig?.minAdvanceHours ?? 2;
     const maxAdvanceDays = tenant.seatingConfig?.maxAdvanceDays ?? 60;
-    const now = new Date();
     const minBookingTime = new Date(now.getTime() + minAdvanceHours * 3600 * 1000);
     const maxBookingDate = new Date(now.getTime() + maxAdvanceDays * 86400 * 1000);
 
@@ -80,25 +44,53 @@ router.get('/:tenantSlug/availability', async (req: Request, res: Response, next
       return;
     }
 
-    const availableSlots = slots.filter((slot) => {
-      const [sh, sm] = slot.split(':').map(Number);
+    // Use real availability service — checks actual table capacity!
+    const availability = await getAvailability({
+      tenantId: tenant.id,
+      date: requestedDate,
+      partySize,
+    });
+
+    if (availability.isClosed) {
+      res.status(200).json({
+        available: false,
+        slots: [],
+        reason: 'Closed',
+        specialNote: availability.specialNote,
+      });
+      return;
+    }
+
+    // Filter out past time slots for today
+    const filteredSlots = availability.slots.filter(slot => {
+      const [sh, sm] = slot.time.split(':').map(Number);
       const slotDatetime = new Date(requestedDate);
       slotDatetime.setHours(sh, sm, 0, 0);
       return slotDatetime >= minBookingTime;
     });
 
+    // Find alternative times if requested slot is full
+    const availableSlots = filteredSlots.filter(s => s.available);
+    const unavailableSlots = filteredSlots.filter(s => !s.available);
+
     res.status(200).json({
-      available: availableSlots.length > 0,
-      slots: availableSlots,
-      partySize,
       date,
+      partySize,
+      isClosed: false,
+      specialNote: availability.specialNote,
+      available: availableSlots.length > 0,
+      slots: filteredSlots,
+      // Suggest alternatives if many slots are full
+      alternatives: availableSlots.length < 3 && availableSlots.length > 0
+        ? availableSlots.map(s => s.time)
+        : undefined,
     });
   } catch (err) {
     next(err);
   }
 });
 
-// GET /:tenantSlug/config  – widget configuration
+// GET /:tenantSlug/config — widget configuration
 router.get('/:tenantSlug/config', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenant = await prisma.tenant.findUnique({

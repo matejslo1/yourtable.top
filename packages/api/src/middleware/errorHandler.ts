@@ -7,7 +7,6 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
-  // Handle known application errors
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
       error: err.name || 'AppError',
@@ -18,7 +17,7 @@ export function errorHandler(
     return;
   }
 
-  // Handle unexpected errors
+  // eslint-disable-next-line no-console
   console.error('[ErrorHandler]', err);
   res.status(500).json({
     error: 'InternalServerError',

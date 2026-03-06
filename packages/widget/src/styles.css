@@ -1,19 +1,47 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Outfit:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Widget container reset */
 .yourtable-widget {
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
-  color: #111827;
   -webkit-font-smoothing: antialiased;
 }
 
-.yourtable-widget * {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+.yourtable-widget .yt-font-display {
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.yourtable-widget .yt-font-body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Animations */
+@keyframes yt-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes yt-slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes yt-pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.yourtable-widget .yt-animate-fade-in {
+  animation: yt-fade-in 0.3s ease-out;
+}
+
+.yourtable-widget .yt-animate-slide-up {
+  animation: yt-slide-up 0.35s ease-out;
+}
+
+.yourtable-widget .yt-animate-pulse-soft {
+  animation: yt-pulse-soft 1.5s ease-in-out infinite;
 }

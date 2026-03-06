@@ -16,7 +16,7 @@ export function LoginPage() {
       await login(email, password);
       navigate('/');
     } catch (err: any) {
-      setError(err.message || 'Prijava ni uspela');
+      setError(err?.message || 'Prijava ni uspela');
     }
   };
 

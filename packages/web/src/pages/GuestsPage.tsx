@@ -1,38 +1,17 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/auth';
-import { Badge, Button, Input, Modal, EmptyState } from '@/components/ui';
+import { Modal } from '@/components/ui';
 
 interface Guest {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  tags: string[];
-  visitCount: number;
-  noShowCount: number;
-  isBlacklisted: boolean;
-  notes: string | null;
-  createdAt: string;
-  _count: { reservations: number };
+  id: string; name: string; email: string | null; phone: string | null;
+  tags: string[]; visitCount: number; noShowCount: number; isBlacklisted: boolean;
+  notes: string | null; createdAt: string;
+  _count?: { reservations: number };
 }
 
 interface GuestDetail extends Guest {
-  reservations: Array<{
-    id: string;
-    date: string;
-    time: string;
-    partySize: number;
-    status: string;
-    source: string;
-    notes: string | null;
-    tables: Array<{ table: { label: string } }>;
-  }>;
+  reservations: Array<{ id: string; date: string; time: string; partySize: number; status: string; tables: Array<{ table: { label: string } }> }>;
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  CONFIRMED: 'success', COMPLETED: 'default', CANCELLED: 'danger',
-  NO_SHOW: 'danger', SEATED: 'purple', PENDING: 'info', HOLD: 'warning',
-};
 
 export function GuestsPage() {
   const [guests, setGuests] = useState<Guest[]>([]);
@@ -40,25 +19,18 @@ export function GuestsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [selectedGuest, setSelectedGuest] = useState<GuestDetail | null>(null);
+  const [detail, setDetail] = useState<GuestDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [newOpen, setNewOpen] = useState(false);
-  const [newForm, setNewForm] = useState({ name: '', email: '', phone: '', tags: '' });
-  const [newLoading, setNewLoading] = useState(false);
 
   const fetchGuests = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: '20' });
-      if (search) params.set('search', search);
-      const res = await apiFetch<{ data: Guest[]; meta: { total: number } }>(`/api/v1/guests?${params}`);
-      setGuests(res.data);
-      setTotal(res.meta.total);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+      const q = search ? `&search=${encodeURIComponent(search)}` : '';
+      const res = await apiFetch<{ data: Guest[]; meta: { total: number } }>(`/api/v1/guests?page=${page}&pageSize=20${q}`);
+      setGuests(res.data || []);
+      setTotal(res.meta?.total || 0);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchGuests(); }, [page, search]);
@@ -66,228 +38,216 @@ export function GuestsPage() {
   const openDetail = async (id: string) => {
     try {
       const res = await apiFetch<{ data: GuestDetail }>(`/api/v1/guests/${id}`);
-      setSelectedGuest(res.data);
+      setDetail(res.data);
       setDetailOpen(true);
-    } catch (err) { console.error(err); }
+    } catch (err: any) { alert(err.message); }
   };
 
   const toggleBlacklist = async (id: string) => {
     try {
       await apiFetch(`/api/v1/guests/${id}/blacklist`, { method: 'PUT' });
       fetchGuests();
-      if (selectedGuest?.id === id) {
-        const res = await apiFetch<{ data: GuestDetail }>(`/api/v1/guests/${id}`);
-        setSelectedGuest(res.data);
+      if (detail?.id === id) {
+        setDetail(d => d ? { ...d, isBlacklisted: !d.isBlacklisted } : null);
       }
-    } catch (err) { console.error(err); }
+    } catch (err: any) { alert(err.message); }
   };
 
-  const createGuest = async () => {
-    if (!newForm.name.trim()) return;
-    setNewLoading(true);
-    try {
-      await apiFetch('/api/v1/guests', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: newForm.name,
-          email: newForm.email || null,
-          phone: newForm.phone || null,
-          tags: newForm.tags ? newForm.tags.split(',').map(t => t.trim()) : [],
-        }),
-      });
-      setNewOpen(false);
-      setNewForm({ name: '', email: '', phone: '', tags: '' });
-      fetchGuests();
-    } catch (err) { console.error(err); }
-    finally { setNewLoading(false); }
-  };
-
-  const totalPages = Math.ceil(total / 20);
+  const pages = Math.ceil(total / 20);
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-gray-900">Gosti</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{total} gostov v bazi</p>
+    <div className="min-h-screen bg-[#F4F6F8]">
+      <div className="max-w-[1400px] mx-auto px-8 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="font-display text-[22px] font-semibold text-[#1E293B] tracking-tight">Gosti</h1>
+            <p className="text-[13px] text-gray-400 mt-0.5">{total} gostov v bazi</p>
+          </div>
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input
+              type="text"
+              placeholder="Išči po imenu, emailu, telefonu..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              className="pl-9 pr-4 py-2 rounded-lg border border-gray-100 bg-white text-[13px] outline-none w-72 focus:border-gray-200"
+              style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+            />
+          </div>
         </div>
-        <Button onClick={() => setNewOpen(true)}>+ Nov gost</Button>
-      </div>
 
-      {/* Search */}
-      <div className="mb-6">
-        <Input
-          placeholder="Iskanje po imenu, emailu ali telefonu..."
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1); }}
-          className="max-w-md"
-        />
-      </div>
-
-      {/* Guest list */}
-      {loading ? (
-        <div className="space-y-3">
-          {[1,2,3,4,5].map(i => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}
-        </div>
-      ) : guests.length === 0 ? (
-        <EmptyState
-          icon="👥"
-          title="Ni najdenih gostov"
-          description={search ? 'Poskusite z drugačnim iskalnim nizom' : 'Dodajte prvega gosta'}
-          action={!search ? { label: '+ Nov gost', onClick: () => setNewOpen(true) } : undefined}
-        />
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/50">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Gost</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Kontakt</th>
-                <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Obiski</th>
-                <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">No-show</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Oznake</th>
-                <th className="px-5 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {guests.map(guest => (
-                <tr
-                  key={guest.id}
-                  className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer transition-colors"
-                  onClick={() => openDetail(guest.id)}
-                >
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500">
-                        {guest.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {guest.name}
-                          {guest.isBlacklisted && <span className="ml-2 text-red-500 text-xs">⛔</span>}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <p className="text-sm text-gray-600">{guest.email || '—'}</p>
-                    <p className="text-xs text-gray-400">{guest.phone || ''}</p>
-                  </td>
-                  <td className="px-5 py-3.5 text-center">
-                    <span className="text-sm font-medium text-gray-900">{guest.visitCount}</span>
-                  </td>
-                  <td className="px-5 py-3.5 text-center">
-                    <span className={`text-sm font-medium ${guest.noShowCount > 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                      {guest.noShowCount}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <div className="flex gap-1 flex-wrap">
-                      {(guest.tags || []).map(tag => (
-                        <Badge key={tag} variant={tag === 'VIP' ? 'success' : 'default'}>{tag}</Badge>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <span className="text-gray-300">›</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
-              <span className="text-sm text-gray-500">Stran {page} od {totalPages}</span>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}>‹ Nazaj</Button>
-                <Button variant="ghost" size="sm" onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}>Naprej ›</Button>
-              </div>
+        {/* Guests table */}
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden" style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
+          {loading ? (
+            <div className="p-6 space-y-3">
+              {[1,2,3,4,5].map(i => <div key={i} className="h-12 bg-gray-50 rounded-lg animate-pulse" />)}
             </div>
+          ) : guests.length === 0 ? (
+            <div className="py-16 text-center">
+              <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              </div>
+              <p className="text-[14px] font-medium text-[#1E293B] mb-1">{search ? 'Ni zadetkov' : 'Ni gostov'}</p>
+              <p className="text-[12px] text-gray-400">{search ? 'Poskusite z drugim iskalnim nizom' : 'Gosti se ustvarijo ob rezervacijah'}</p>
+            </div>
+          ) : (
+            <>
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50/50 border-b border-gray-50">
+                    <th className="text-left px-6 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Gost</th>
+                    <th className="text-left px-6 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Kontakt</th>
+                    <th className="text-center px-6 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Obiskov</th>
+                    <th className="text-center px-6 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">No-show</th>
+                    <th className="text-left px-6 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Oznake</th>
+                    <th className="text-right px-6 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Akcije</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {guests.map(g => (
+                    <tr key={g.id} className="border-t border-gray-50 hover:bg-gray-50/40 transition-colors cursor-pointer" onClick={() => openDetail(g.id)}>
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold ${
+                            g.isBlacklisted ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-400'
+                          }`}>
+                            {g.isBlacklisted ? '⛔' : g.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-[13px] font-medium text-[#1E293B]">{g.name}</p>
+                            {g.isBlacklisted && <p className="text-[10px] text-red-400">Črna lista</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <p className="text-[12px] text-gray-500">{g.email || '—'}</p>
+                        <p className="text-[11px] text-gray-300">{g.phone || ''}</p>
+                      </td>
+                      <td className="px-6 py-3 text-center">
+                        <span className="text-[13px] font-medium text-[#1E293B]">{g.visitCount || g._count?.reservations || 0}</span>
+                      </td>
+                      <td className="px-6 py-3 text-center">
+                        {g.noShowCount > 0 ? (
+                          <span className="text-[12px] font-medium text-red-500">{g.noShowCount}</span>
+                        ) : (
+                          <span className="text-[12px] text-gray-300">0</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex gap-1 flex-wrap">
+                          {(g.tags || []).map(t => (
+                            <span key={t} className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-100">{t}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 text-right">
+                        <button
+                          onClick={e => { e.stopPropagation(); toggleBlacklist(g.id); }}
+                          className={`text-[10px] font-medium px-2 py-1 rounded transition-colors ${
+                            g.isBlacklisted ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:bg-red-50 hover:text-red-500'
+                          }`}
+                        >
+                          {g.isBlacklisted ? 'Odblokraj' : 'Blokiraj'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Pagination */}
+              {pages > 1 && (
+                <div className="flex items-center justify-between px-6 py-3 border-t border-gray-50">
+                  <span className="text-[11px] text-gray-400">Stran {page} od {pages}</span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-2.5 py-1 rounded text-[11px] font-medium text-gray-400 hover:bg-gray-50 disabled:opacity-30"
+                    >← Nazaj</button>
+                    <button
+                      onClick={() => setPage(p => Math.min(pages, p + 1))}
+                      disabled={page === pages}
+                      className="px-2.5 py-1 rounded text-[11px] font-medium text-gray-400 hover:bg-gray-50 disabled:opacity-30"
+                    >Naprej →</button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
-      )}
 
-      {/* Guest detail modal */}
-      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={selectedGuest?.name || ''} width="max-w-2xl">
-        {selectedGuest && (
-          <div className="space-y-6">
-            {/* Info grid */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-400">E-mail</p>
-                <p className="text-sm font-medium text-gray-900 mt-0.5">{selectedGuest.email || '—'}</p>
+        {/* Detail modal */}
+        <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={detail?.name || 'Gost'} width="max-w-xl">
+          {detail && (
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-3">
+                <InfoBox label="Email" value={detail.email || '—'} />
+                <InfoBox label="Telefon" value={detail.phone || '—'} />
+                <InfoBox label="Obiskov" value={String(detail.visitCount || 0)} />
+                <InfoBox label="No-show" value={String(detail.noShowCount || 0)} highlight={detail.noShowCount > 0} />
               </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-400">Telefon</p>
-                <p className="text-sm font-medium text-gray-900 mt-0.5">{selectedGuest.phone || '—'}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-400">Obiski / No-show</p>
-                <p className="text-sm font-medium text-gray-900 mt-0.5">
-                  {selectedGuest.visitCount} / <span className={selectedGuest.noShowCount > 0 ? 'text-red-600' : ''}>{selectedGuest.noShowCount}</span>
-                </p>
-              </div>
-            </div>
 
-            {/* Tags */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {(selectedGuest.tags || []).map(tag => (
-                <Badge key={tag} variant={tag === 'VIP' ? 'success' : 'default'} size="md">{tag}</Badge>
-              ))}
-              <Button
-                variant={selectedGuest.isBlacklisted ? 'danger' : 'ghost'}
-                size="sm"
-                onClick={() => toggleBlacklist(selectedGuest.id)}
-              >
-                {selectedGuest.isBlacklisted ? '⛔ Odstrani s črne liste' : '⛔ Črna lista'}
-              </Button>
-            </div>
-
-            {/* Reservation history */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Zgodovina rezervacij</h3>
-              {selectedGuest.reservations.length === 0 ? (
-                <p className="text-sm text-gray-400">Ni preteklih rezervacij</p>
-              ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {selectedGuest.reservations.map(res => (
-                    <div key={res.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {new Date(res.date).toLocaleDateString('sl-SI')} ob {res.time}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {res.partySize} oseb · {res.tables.map(t => t.table.label).join(', ')} · {res.source}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge variant={(STATUS_COLORS[res.status] || 'default') as any}>{res.status}</Badge>
-                    </div>
+              {detail.tags?.length > 0 && (
+                <div className="flex gap-1.5 flex-wrap">
+                  {detail.tags.map(t => (
+                    <span key={t} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-100">{t}</span>
                   ))}
                 </div>
               )}
-            </div>
-          </div>
-        )}
-      </Modal>
 
-      {/* New guest modal */}
-      <Modal open={newOpen} onClose={() => setNewOpen(false)} title="Nov gost">
-        <div className="space-y-4">
-          <Input label="Ime in priimek *" value={newForm.name} onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))} placeholder="Janez Novak" />
-          <Input label="E-mail" type="email" value={newForm.email} onChange={e => setNewForm(f => ({ ...f, email: e.target.value }))} placeholder="janez@email.com" />
-          <Input label="Telefon" type="tel" value={newForm.phone} onChange={e => setNewForm(f => ({ ...f, phone: e.target.value }))} placeholder="+386 41 123 456" />
-          <Input label="Oznake (ločene z vejico)" value={newForm.tags} onChange={e => setNewForm(f => ({ ...f, tags: e.target.value }))} placeholder="VIP, alergija-gluten" />
-          <div className="flex gap-3 pt-2">
-            <Button variant="secondary" onClick={() => setNewOpen(false)} className="flex-1">Prekliči</Button>
-            <Button onClick={createGuest} loading={newLoading} className="flex-[2]">Ustvari gosta</Button>
-          </div>
-        </div>
-      </Modal>
+              {detail.notes && <p className="text-[12px] text-gray-400 italic">"{detail.notes}"</p>}
+
+              {/* Reservation history */}
+              {detail.reservations?.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em] mb-2">Zgodovina rezervacij</p>
+                  <div className="space-y-1.5 max-h-[240px] overflow-y-auto">
+                    {detail.reservations.map(r => (
+                      <div key={r.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50/60">
+                        <span className="text-[12px] text-gray-400 tabular-nums w-20">
+                          {new Date(r.date).toLocaleDateString('sl-SI', { day: 'numeric', month: 'short' })}
+                        </span>
+                        <span className="text-[12px] font-medium text-[#1E293B] w-12 tabular-nums">{r.time}</span>
+                        <span className="text-[11px] text-gray-400">{r.partySize} os.</span>
+                        <span className="text-[11px] text-gray-300">{r.tables?.map(t => t.table?.label).join(', ') || ''}</span>
+                        <span className={`ml-auto text-[9px] font-semibold px-1.5 py-0.5 rounded-full border uppercase tracking-wider ${
+                          r.status === 'CONFIRMED' || r.status === 'COMPLETED' ? 'text-emerald-500 border-emerald-200' :
+                          r.status === 'CANCELLED' || r.status === 'NO_SHOW' ? 'text-red-400 border-red-200' :
+                          'text-gray-400 border-gray-200'
+                        }`}>
+                          {r.status === 'CONFIRMED' ? 'Potrjena' : r.status === 'COMPLETED' ? 'Zaključena' : r.status === 'CANCELLED' ? 'Preklicana' : r.status === 'NO_SHOW' ? 'No-show' : r.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => toggleBlacklist(detail.id)}
+                  className={`px-4 py-2 rounded-lg text-[12px] font-medium transition-colors ${
+                    detail.isBlacklisted ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-red-50 text-red-500 hover:bg-red-100'
+                  }`}
+                >{detail.isBlacklisted ? 'Odblokraj gosta' : 'Dodaj na črno listo'}</button>
+                <button onClick={() => setDetailOpen(false)} className="flex-1 px-4 py-2 rounded-lg bg-gray-50 text-gray-500 text-[12px] font-medium hover:bg-gray-100 transition-colors">
+                  Zapri
+                </button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      </div>
+    </div>
+  );
+}
+
+function InfoBox({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="bg-gray-50/60 rounded-lg px-3 py-2.5">
+      <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
+      <p className={`text-[13px] font-medium ${highlight ? 'text-red-500' : 'text-[#1E293B]'}`}>{value}</p>
     </div>
   );
 }

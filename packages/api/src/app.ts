@@ -49,14 +49,21 @@ app.use('/api/v1/public/', holdLimiter);
 
 // Health Check
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0', phase: 6 });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.1.0', phase: 7 });
 });
 
 // API Routes (v1) - Authenticated
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/tenant', tenantRoutes);
 app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/floor-plans', floorPlanRoutes);
+
+/** * FIXED: Supporting both hyphen and underscore to stop 404 errors.
+ * Terminal logs show requests for both 'floor_plans' and 'floor-plans'.
+ *
+ */
+app.use('/api/v1/floor-plans', floorPlanRoutes); 
+app.use('/api/v1/floor_plans', floorPlanRoutes); 
+
 app.use('/api/v1/tables', tableStatusRoutes);
 app.use('/api/v1/config', configRoutes);
 app.use('/api/v1/reservations', reservationRoutes);
@@ -71,7 +78,11 @@ app.use('/api/v1/public', publicAvailabilityRoutes);
 
 // 404 + Error Handler
 app.use((_req, res) => {
-  res.status(404).json({ error: 'NotFoundError', message: 'The requested endpoint does not exist', statusCode: 404 });
+  res.status(404).json({ 
+    error: 'NotFoundError', 
+    message: 'The requested endpoint does not exist', 
+    statusCode: 404 
+  });
 });
 
 app.use(errorHandler);

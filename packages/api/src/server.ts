@@ -5,5 +5,5 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 
 app.listen(PORT, () => {
   console.log(`[Server] Running on port ${PORT} (${process.env.NODE_ENV ?? 'development'})`);
-  startHoldCleanupJob();
+  // startHoldCleanupJob(); // ⛔ začasno izklopi
 });

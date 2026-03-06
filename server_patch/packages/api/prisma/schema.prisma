@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id           String        @id @default(cuid())
+  name         String
+  slug         String        @unique
+  users        User[]
+  reservations Reservation[]
+  floorPlans   FloorPlan[]
+  tables       Table[]
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  role           String   @default("staff")
+  supabaseUserId String   @unique
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model FloorPlan {
+  id        String   @id @default(cuid())
+  name      String
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tables    Table[]
+}
+
+model Table {
+  id           String   @id @default(cuid())
+  label        String
+  minCapacity  Int
+  maxCapacity  Int
+  shape        String
+  x            Float
+  y            Float
+  floorPlanId  String
+  floorPlan    FloorPlan @relation(fields: [floorPlanId], references: [id])
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  reservations ReservationTable[]
+}
+
+model Guest {
+  id           String        @id @default(cuid())
+  name         String
+  reservations Reservation[]
+}
+
+model Reservation {
+  id          String   @id @default(cuid())
+  date        DateTime
+  time        String
+  partySize   Int
+  status      String   @default("CONFIRMED")
+  guestId     String
+  guest       Guest    @relation(fields: [guestId], references: [id])
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  tables      ReservationTable[]
+}
+
+model ReservationTable {
+  id            String      @id @default(cuid())
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id])
+  tableId       String
+  table         Table       @relation(fields: [tableId], references: [id])
+  @@unique([reservationId, tableId])
+}

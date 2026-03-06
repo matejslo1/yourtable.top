@@ -134,6 +134,7 @@ export function confirmationEmailHtml(data: {
   tenantName: string;
   tenantAddress: string;
   tables?: string;
+  cancelUrl?: string;
 }): string {
   const content = `
     <h2 style="margin:0 0 8px;font-size:22px;color:#111827;">Rezervacija potrjena!</h2>
@@ -166,6 +167,12 @@ export function confirmationEmailHtml(data: {
     <p style="margin:0;font-size:13px;color:#9ca3af;">
       Če želite spremeniti ali preklicati rezervacijo, nas kontaktirajte.
     </p>
+    ${data.cancelUrl ? `
+    <div style="margin-top:16px;text-align:center;">
+      <a href="${data.cancelUrl}" style="display:inline-block;padding:10px 24px;background:#ef4444;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">
+        Prekliči rezervacijo
+      </a>
+    </div>` : ''}
   `;
   return baseTemplate(content, data.tenantName);
 }

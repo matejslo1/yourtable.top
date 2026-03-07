@@ -43,7 +43,7 @@ export async function sendSms(params: SendSmsParams): Promise<boolean> {
       }).toString(),
     });
 
-    const data = await res.json();
+    const data: any = await res.json();
 
     if (!res.ok) {
       console.error('[SMS] Twilio error:', data);

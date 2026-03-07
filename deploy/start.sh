@@ -26,6 +26,16 @@ for i in $(seq 1 20); do
     sleep 1
 done
 
+# Auto-create superadmin if env vars are set
+if [ -n "$SUPERADMIN_EMAIL" ] && [ -n "$SUPERADMIN_PASSWORD" ] && [ -n "$SUPERADMIN_NAME" ] && [ -n "$SETUP_SECRET" ]; then
+    echo "[2b] Creating superadmin if not exists..."
+    RESULT=$(wget -qO- --post-data="{\"email\":\"${SUPERADMIN_EMAIL}\",\"password\":\"${SUPERADMIN_PASSWORD}\",\"name\":\"${SUPERADMIN_NAME}\"}" \
+        --header="Content-Type: application/json" \
+        --header="x-setup-secret: ${SETUP_SECRET}" \
+        http://127.0.0.1:3001/api/v1/setup/superadmin 2>&1 || true)
+    echo "     Superadmin: ${RESULT}"
+fi
+
 # Inject Railway's PORT into nginx config (defaults to 80)
 sed -i "s/__PORT__/${PORT:-80}/" /etc/nginx/http.d/default.conf
 

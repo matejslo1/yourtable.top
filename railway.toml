@@ -15,6 +15,6 @@ VITE_SUPABASE_ANON_KEY = "${{SUPABASE_ANON_KEY}}"
 
 [deploy]
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 60
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 5

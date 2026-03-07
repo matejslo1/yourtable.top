@@ -5,33 +5,29 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "  YourTable.top — Starting..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# Run Prisma migrations (safe in production — only applies pending)
+# Run Prisma migrations with a timeout so it never hangs
 echo "[1/4] Running database migrations..."
 cd /app/packages/api
-npx prisma migrate deploy 2>/dev/null || npx prisma db push --accept-data-loss 2>/dev/null || echo "⚠️  Migration skipped (run manually if first deploy)"
-
-# Generate Prisma client (ensure it matches the schema)
-echo "[2/4] Generating Prisma client..."
-npx prisma generate
+timeout 20 npx prisma migrate deploy || echo "⚠️  Migration skipped or timed out — continuing"
 
 # Start API server in background
-echo "[3/4] Starting API server on port 3001..."
+echo "[2/4] Starting API server on port 3001..."
 cd /app
 NODE_ENV=production node packages/api/dist/server.js &
 API_PID=$!
 
-# Wait for API to be ready
+# Wait for API to be ready (max 20s)
 echo "     Waiting for API..."
-for i in $(seq 1 30); do
+for i in $(seq 1 20); do
     if wget -qO- http://127.0.0.1:3001/health > /dev/null 2>&1; then
-        echo "     ✓ API ready"
+        echo "     ✓ API ready after ${i}s"
         break
     fi
     sleep 1
 done
 
 # Start nginx in foreground
-echo "[4/4] Starting nginx on port 80..."
+echo "[3/4] Starting nginx on port 80..."
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  ✓ YourTable.top is running!"

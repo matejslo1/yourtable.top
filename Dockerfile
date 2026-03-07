@@ -7,7 +7,7 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 
 # ──────────────────────────────────────────────
-# Stage 1: Install dependencies
+# Stage 1: Install all deps for build
 # ──────────────────────────────────────────────
 FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -25,8 +25,7 @@ FROM deps AS build-shared
 COPY packages/shared/ packages/shared/
 COPY tsconfig.json ./
 RUN pnpm --filter @yourtable/shared build
-
-RUN node -e "const p=require('./packages/shared/package.json');p.main='./dist/index.js';p.types='./dist/index.d.ts';p.exports={'.':{'import':'./dist/index.js','types':'./dist/index.d.ts'}};require('fs').writeFileSync('./packages/shared/package.json',JSON.stringify(p,null,2))"
+RUN node -e "const fs=require('fs');const p=require('./packages/shared/package.json');p.main='./dist/index.js';p.types='./dist/index.d.ts';p.exports={'.':{'import':'./dist/index.js','types':'./dist/index.d.ts'}};fs.writeFileSync('./packages/shared/package.json',JSON.stringify(p,null,2))"
 
 # ──────────────────────────────────────────────
 # Stage 3: Build API
@@ -59,7 +58,7 @@ ENV VITE_API_URL=${VITE_API_URL}
 RUN pnpm --filter @yourtable/widget build
 
 # ──────────────────────────────────────────────
-# Stage 6: Production
+# Stage 6: Production runtime
 # ──────────────────────────────────────────────
 FROM node:20-alpine AS production
 RUN corepack enable && corepack prepare pnpm@9 --activate
@@ -67,27 +66,22 @@ RUN apk add --no-cache nginx
 
 WORKDIR /app
 
-# Workspace root deps
-COPY --from=deps /app/node_modules/ node_modules/
-COPY package.json pnpm-workspace.yaml ./
+# Copy workspace manifests
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/shared/package.json packages/shared/
+COPY packages/api/package.json packages/api/
 
-# API
+# Install only production dependencies in final image
+RUN pnpm install --prod --frozen-lockfile
+
+# Copy built output
+COPY --from=build-shared /app/packages/shared/dist/ packages/shared/dist/
+COPY --from=build-shared /app/packages/shared/package.json packages/shared/package.json
+
 COPY --from=build-api /app/packages/api/dist/ packages/api/dist/
-COPY --from=build-api /app/packages/api/package.json packages/api/
-COPY --from=build-api /app/packages/api/node_modules/ packages/api/node_modules/
+COPY --from=build-api /app/packages/api/package.json packages/api/package.json
 COPY --from=build-api /app/packages/api/prisma/ packages/api/prisma/
 
-# Shared
-COPY --from=build-shared /app/packages/shared/dist/ packages/shared/dist/
-COPY --from=build-shared /app/packages/shared/package.json packages/shared/
-COPY --from=build-shared /app/packages/shared/node_modules/ packages/shared/node_modules/
-
-# Fix local workspace resolution for shared inside api
-RUN rm -rf packages/api/node_modules/@yourtable/shared && \
-    mkdir -p packages/api/node_modules/@yourtable && \
-    ln -s /app/packages/shared packages/api/node_modules/@yourtable/shared
-
-# Static assets
 COPY --from=build-web /app/packages/web/dist/ /var/www/web/
 COPY --from=build-widget /app/packages/widget/dist/ /var/www/widget/
 

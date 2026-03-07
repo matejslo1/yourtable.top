@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import prisma from '../lib/prisma.js';
 import { requireAuth, requireRole, AuthRequest } from '../middleware/auth.js';
 import { supabaseAdmin } from '../utils/supabase.js';
+import { UserRole } from '@prisma/client';
 
 const router = Router();
 router.use(requireAuth);
@@ -59,7 +60,7 @@ router.post('/', requireRole('owner', 'admin'), async (req: AuthRequest, res: Re
         supabaseUserId: authData.user.id,
         email,
         name,
-        role,
+        role: role as UserRole,
       },
     });
 
@@ -79,7 +80,7 @@ router.patch('/:id', requireRole('owner', 'admin'), async (req: AuthRequest, res
 
     const user = await prisma.user.update({
       where: { id: req.params.id },
-      data: { ...(name && { name }), ...(role && { role }) },
+      data: { ...(name && { name }), ...(role && { role: role as UserRole }) },
     });
 
     res.status(200).json(user);

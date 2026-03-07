@@ -9,7 +9,7 @@ const STRIPE_API = 'https://api.stripe.com/v1';
 /**
  * Make a Stripe API request
  */
-async function stripeRequest(endpoint: string, method: string = 'GET', body?: Record<string, string>) {
+async function stripeRequest(endpoint: string, method: string = 'GET', body?: Record<string, string>): Promise<any> {
   if (!STRIPE_SECRET_KEY) {
     throw new AppError('Stripe is not configured. Set STRIPE_SECRET_KEY.', 500);
   }
@@ -27,7 +27,7 @@ async function stripeRequest(endpoint: string, method: string = 'GET', body?: Re
   }
 
   const res = await fetch(`${STRIPE_API}${endpoint}`, options);
-  const data = await res.json();
+  const data: any = await res.json();
 
   if (!res.ok) {
     console.error('[Stripe] API error:', data);

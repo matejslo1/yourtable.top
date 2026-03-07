@@ -210,7 +210,7 @@ export async function redeemVoucher(params: RedeemVoucherParams) {
 
   await createAuditLog({
     tenantId, userId,
-    action: 'redeem',
+    action: 'status_change' as const,
     entityType: 'voucher',
     entityId: voucher.id,
     changes: { code, amount: redeemAmount, remaining: result.newRemaining },
@@ -297,7 +297,7 @@ export async function cancelVoucher(tenantId: string, userId: string, voucherId:
 
   await createAuditLog({
     tenantId, userId,
-    action: 'cancel',
+    action: 'status_change' as const,
     entityType: 'voucher',
     entityId: voucherId,
     changes: { previousStatus: voucher.status },

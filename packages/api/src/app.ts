@@ -22,6 +22,9 @@ import voucherRoutes from './routes/vouchers.js';
 
 const app = express();
 
+// Trust nginx reverse proxy (required for express-rate-limit and X-Forwarded-For)
+app.set('trust proxy', 1);
+
 // Global Middleware
 app.use(helmet());
 

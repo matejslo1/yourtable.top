@@ -27,7 +27,7 @@ async function stripeRequest(endpoint: string, method: string = 'GET', body?: Re
   }
 
   const res = await fetch(`${STRIPE_API}${endpoint}`, options);
-  const data = await res.json();
+  const data: any = await res.json();
 
   if (!res.ok) {
     console.error('[Stripe] API error:', data);

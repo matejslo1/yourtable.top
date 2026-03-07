@@ -26,8 +26,11 @@ for i in $(seq 1 20); do
     sleep 1
 done
 
+# Inject Railway's PORT into nginx config (defaults to 80)
+sed -i "s/__PORT__/${PORT:-80}/" /etc/nginx/http.d/default.conf
+
 # Start nginx in foreground
-echo "[3/4] Starting nginx on port 80..."
+echo "[3/4] Starting nginx on port ${PORT:-80}..."
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  ✓ YourTable.top is running!"

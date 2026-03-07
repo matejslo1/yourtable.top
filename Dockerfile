@@ -61,9 +61,12 @@ RUN pnpm --filter @yourtable/widget build
 # Stage 6: Deploy API
 # ──────────────────────────────────────────────
 FROM build-api AS deploy
-# This isolates the api package and installs ONLY its production 
+# This isolates the api package and installs ONLY its production
 # dependencies (including local workspaces like @yourtable/shared)
 RUN pnpm deploy --filter @yourtable/api --prod /deployed-api
+
+# pnpm deploy respects .gitignore which excludes dist/, so copy it explicitly
+RUN cp -r /app/packages/api/dist /deployed-api/dist
 
 # Because pnpm deploy creates a fresh production node_modules folder,
 # we need to regenerate the Prisma client inside this isolated environment

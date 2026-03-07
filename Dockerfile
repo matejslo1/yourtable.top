@@ -58,37 +58,38 @@ ENV VITE_API_URL=${VITE_API_URL}
 RUN pnpm --filter @yourtable/widget build
 
 # ──────────────────────────────────────────────
-# Stage 6: Production runtime
+# Stage 6: Deploy API
+# ──────────────────────────────────────────────
+FROM build-widget AS deploy
+# This isolates the api package and installs ONLY its production 
+# dependencies (including local workspaces like @yourtable/shared)
+RUN pnpm deploy --filter @yourtable/api --prod /deployed-api
+
+# Because pnpm deploy creates a fresh production node_modules folder,
+# we need to regenerate the Prisma client inside this isolated environment
+WORKDIR /deployed-api
+RUN npx prisma generate
+
+# ──────────────────────────────────────────────
+# Stage 7: Production runtime
 # ──────────────────────────────────────────────
 FROM node:20-alpine AS production
-RUN corepack enable && corepack prepare pnpm@9 --activate
+# We don't need corepack or pnpm in the final image anymore!
 RUN apk add --no-cache nginx
 
 WORKDIR /app
 
-# Copy workspace manifests
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY packages/shared/package.json packages/shared/
-COPY packages/api/package.json packages/api/
+# Copy the standalone API folder exactly to where start.sh expects it
+COPY --from=deploy /deployed-api ./packages/api
 
-# Install only production dependencies in final image
-RUN pnpm install --prod --frozen-lockfile
-
-# Copy built output
-COPY --from=build-shared /app/packages/shared/dist/ packages/shared/dist/
-COPY --from=build-shared /app/packages/shared/package.json packages/shared/package.json
-
-COPY --from=build-api /app/packages/api/dist/ packages/api/dist/
-COPY --from=build-api /app/packages/api/package.json packages/api/package.json
-COPY --from=build-api /app/packages/api/prisma/ packages/api/prisma/
-
+# Copy the pre-built frontend static assets
 COPY --from=build-web /app/packages/web/dist/ /var/www/web/
 COPY --from=build-widget /app/packages/widget/dist/ /var/www/widget/
 
-# Nginx
+# Nginx setup
 COPY deploy/nginx.conf /etc/nginx/http.d/default.conf
 
-# Startup
+# Startup script
 COPY deploy/start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 

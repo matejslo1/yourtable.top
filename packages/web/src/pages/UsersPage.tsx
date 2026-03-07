@@ -69,7 +69,8 @@ function InviteModal({ open, onClose, onSaved }: { open: boolean; onClose: () =>
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1.5">Role</label>
-<Select value={form.role} onChange={e => set('role', e.target.value)} options={ROLE_OPTIONS}>            {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+          <Select value={form.role} onChange={e => set('role', e.target.value)}>
+            {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
           </Select>
         </div>
         <div className="flex gap-2 pt-2">
@@ -118,7 +119,7 @@ function EditModal({ user, onClose, onSaved }: { user: User | null; onClose: () 
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1.5">Role</label>
-          <Select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} options={ROLE_OPTIONS}>
+          <Select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}>
             {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
           </Select>
         </div>

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker info)",
+      "Bash(docker build -t matejslo1/yourtable.top:latest .)"
+    ]
+  }
+}

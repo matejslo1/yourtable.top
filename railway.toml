@@ -9,7 +9,7 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [build.args]
-VITE_API_URL = "https://${{RAILWAY_PUBLIC_DOMAIN}}"
+VITE_API_URL = ""
 VITE_SUPABASE_URL = "${{SUPABASE_URL}}"
 VITE_SUPABASE_ANON_KEY = "${{SUPABASE_ANON_KEY}}"
 

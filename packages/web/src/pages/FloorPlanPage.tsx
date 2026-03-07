@@ -49,6 +49,7 @@ export function FloorPlanPage() {
   const [newPlanLoading, setNewPlanLoading] = useState(false);
   
   const [editForm, setEditForm] = useState({ label: '', minSeats: '2', maxSeats: '4', shape: 'square', isVip: false, isCombinable: false, joinGroup: '' });
+const [editLoading, setEditLoading] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const fetchFloorPlans = async () => {

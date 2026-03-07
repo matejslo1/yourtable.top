@@ -9,6 +9,8 @@ node_modules
 # Build outputs (Docker will generate its own)
 dist
 **/dist
+*.tsbuildinfo
+**/*.tsbuildinfo
 .next
 **/.next
 build

@@ -8,5 +8,6 @@
     "target": "ES2022",
     "noEmit": false
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "references": [{ "path": "../shared" }]
 }

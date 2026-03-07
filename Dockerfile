@@ -60,7 +60,7 @@ RUN pnpm --filter @yourtable/widget build
 # ──────────────────────────────────────────────
 # Stage 6: Deploy API
 # ──────────────────────────────────────────────
-FROM build-widget AS deploy
+FROM build-api AS deploy
 # This isolates the api package and installs ONLY its production 
 # dependencies (including local workspaces like @yourtable/shared)
 RUN pnpm deploy --filter @yourtable/api --prod /deployed-api
@@ -68,7 +68,7 @@ RUN pnpm deploy --filter @yourtable/api --prod /deployed-api
 # Because pnpm deploy creates a fresh production node_modules folder,
 # we need to regenerate the Prisma client inside this isolated environment
 WORKDIR /deployed-api
-RUN npx prisma generate
+RUN ./node_modules/.bin/prisma generate
 
 # ──────────────────────────────────────────────
 # Stage 7: Production runtime

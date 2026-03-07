@@ -78,9 +78,15 @@ COPY --from=build-api /app/packages/api/dist/ packages/api/dist/
 COPY --from=build-api /app/packages/api/package.json packages/api/
 COPY --from=build-api /app/packages/api/node_modules/ packages/api/node_modules/
 COPY --from=build-api /app/packages/api/prisma/ packages/api/prisma/
-COPY --from=build-shared /app/packages/shared/ packages/shared/
+# Copy shared dist only (not src) and the patched package.json
+COPY --from=build-shared /app/packages/shared/dist/ packages/shared/dist/
+COPY --from=build-shared /app/packages/shared/package.json packages/shared/
 COPY --from=deps /app/node_modules/ node_modules/
 COPY package.json pnpm-workspace.yaml ./
+# Fix the node_modules symlink so @yourtable/shared resolves to dist
+RUN rm -rf packages/api/node_modules/@yourtable/shared && \
+    mkdir -p packages/api/node_modules/@yourtable && \
+    ln -s /app/packages/shared packages/api/node_modules/@yourtable/shared
 
 # Copy static builds
 COPY --from=build-web /app/packages/web/dist/ /var/www/web/

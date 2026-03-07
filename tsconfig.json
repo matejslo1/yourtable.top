@@ -1,15 +1,29 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "lib": ["ES2022"],
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "sourceMap": true
+  "name": "@yourtable/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "prestart": "pnpm --filter @yourtable/shared build",
+    "start": "node dist/server.js",
+    "lint": "eslint src/",
+    "typecheck": "pnpm --filter @yourtable/shared build && tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio"
   },
-  "exclude": ["node_modules", "dist"]
-}
+  "dependencies": {
+    "@prisma/client": "^6.0.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "@yourtable/shared": "workspace:*",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "zod": "^3.

@@ -18,6 +18,7 @@ WORKDIR /app
 # ──────────────────────────────────────────────
 FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY tsconfig.json ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/api/package.json packages/api/
 COPY packages/web/package.json packages/web/
@@ -30,7 +31,9 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS build-shared
 COPY packages/shared/ packages/shared/
 COPY tsconfig.json ./
+RUN echo --- ROOT TSCONFIG IN BUILD-SHARED --- && cat /app/tsconfig.json
 RUN pnpm --filter @yourtable/shared build
+
 # Point shared package.json to compiled dist (not raw .ts sources)
 RUN node -e "const p=require('./packages/shared/package.json');p.main='./dist/index.js';p.types='./dist/index.d.ts';p.exports={'.':{'import':'./dist/index.js','types':'./dist/index.d.ts'}};require('fs').writeFileSync('./packages/shared/package.json',JSON.stringify(p,null,2))"
 
@@ -53,6 +56,7 @@ ARG VITE_SUPABASE_ANON_KEY
 ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
 ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+RUN echo --- ROOT TSCONFIG IN BUILD-WEB --- && cat /app/tsconfig.json
 RUN pnpm --filter @yourtable/web build
 
 # ──────────────────────────────────────────────
@@ -62,6 +66,8 @@ FROM build-shared AS build-widget
 COPY packages/widget/ packages/widget/
 ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
+RUN echo --- ROOT TSCONFIG IN BUILD-WIDGET --- && cat /app/tsconfig.json
+RUN echo --- ROOT FILES IN /app --- && ls -la /app
 RUN pnpm --filter @yourtable/widget build
 
 # ──────────────────────────────────────────────
@@ -78,11 +84,14 @@ COPY --from=build-api /app/packages/api/dist/ packages/api/dist/
 COPY --from=build-api /app/packages/api/package.json packages/api/
 COPY --from=build-api /app/packages/api/node_modules/ packages/api/node_modules/
 COPY --from=build-api /app/packages/api/prisma/ packages/api/prisma/
+
 # Copy shared dist only (not src) and the patched package.json
 COPY --from=build-shared /app/packages/shared/dist/ packages/shared/dist/
 COPY --from=build-shared /app/packages/shared/package.json packages/shared/
+
 COPY --from=deps /app/node_modules/ node_modules/
 COPY package.json pnpm-workspace.yaml ./
+
 # Fix the node_modules symlink so @yourtable/shared resolves to dist
 RUN rm -rf packages/api/node_modules/@yourtable/shared && \
     mkdir -p packages/api/node_modules/@yourtable && \

@@ -26,8 +26,8 @@ export function DatePicker({ selectedDate, onSelect, minDate, maxDate }: DatePic
 
     const result: Array<{ date: Date; inMonth: boolean; disabled: boolean }> = [];
 
-    for (let i = startDow - 1; i >= 0; i--) {
-      const d = new Date(viewYear, viewMonth, -i);
+    for (let i = startDow; i > 0; i--) {
+      const d = new Date(viewYear, viewMonth, 1 - i);
       result.push({ date: d, inMonth: false, disabled: true });
     }
 

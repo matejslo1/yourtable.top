@@ -1,0 +1,31 @@
+# ============================================
+# YourTable.top — Production Docker Compose
+# ============================================
+# Uporaba:
+#   1. Kopiraj .env.example v .env in izpolni
+#   2. docker compose -f docker-compose.prod.yml up -d --build
+#
+# Za Railway/Render/Fly.io: uporabi samo Dockerfile
+
+services:
+  yourtable:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://api.yourtable.top}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    ports:
+      - "${EXPOSE_PORT:-80}:80"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

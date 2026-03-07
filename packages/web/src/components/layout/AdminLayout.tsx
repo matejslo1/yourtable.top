@@ -153,7 +153,7 @@ const NAV: NavGroup[] = [
           { label: 'Delovni čas', to: '/settings' },
           { label: 'Mize', to: '/floor-plan' },
           { label: 'Integracije', soon: true },
-          { label: 'Uporabniki', soon: true },
+          { label: 'Uporabniki', to: '/users' },
           { label: 'Vloge & pravice', soon: true },
         ],
       },

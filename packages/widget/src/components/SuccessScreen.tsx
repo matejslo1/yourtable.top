@@ -10,7 +10,9 @@ const DAYS_SL = ['nedelja', 'ponedeljek', 'torek', 'sreda', 'četrtek', 'petek',
 const MONTHS_SL = ['januar', 'februar', 'marec', 'april', 'maj', 'junij', 'julij', 'avgust', 'september', 'oktober', 'november', 'december'];
 
 function formatDateSl(dateStr: string): string {
-  const d = new Date(dateStr);
+  // Parse as local date to avoid UTC timezone offset shifting the day
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
   return `${DAYS_SL[d.getDay()]}, ${d.getDate()}. ${MONTHS_SL[d.getMonth()]} ${d.getFullYear()}`;
 }
 

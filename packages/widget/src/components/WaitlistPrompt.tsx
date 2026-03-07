@@ -130,6 +130,6 @@ export function WaitlistPrompt({
 }
 
 function formatDateShort(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return `${day}.${month}.${year}`;
 }

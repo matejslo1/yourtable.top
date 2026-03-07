@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { apiFetch } from '@/lib/auth';
-import { Button, Modal, Input, Select, Badge, EmptyState } from '@/components/ui';
+import { Button, Modal, Input, Select, EmptyState } from '@/components/ui';
 
 interface Table {
   id: string;
@@ -48,6 +48,7 @@ export function FloorPlanPage() {
   const [newPlanName, setNewPlanName] = useState('');
   const [newPlanLoading, setNewPlanLoading] = useState(false);
   
+  const [editForm, setEditForm] = useState({ label: '', minSeats: '2', maxSeats: '4', shape: 'square', isVip: false, isCombinable: false, joinGroup: '' });
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const fetchFloorPlans = async () => {
@@ -174,6 +175,30 @@ export function FloorPlanPage() {
     finally { setAddLoading(false); }
   };
 
+  // Save table edits
+  const saveTable = async () => {
+    if (!selectedTable || !activePlan) return;
+    setEditLoading(true);
+    try {
+      await apiFetch(`/api/v1/floor-plans/${activePlan}/tables/${selectedTable.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          label: editForm.label,
+          minSeats: parseInt(editForm.minSeats),
+          maxSeats: parseInt(editForm.maxSeats),
+          shape: editForm.shape,
+          isVip: editForm.isVip,
+          isCombinable: editForm.isCombinable,
+          joinGroup: editForm.joinGroup || null,
+        }),
+      });
+      setEditOpen(false);
+      setSelectedTable(null);
+      fetchFloorPlans();
+    } catch (err: any) { alert(err.message); }
+    finally { setEditLoading(false); }
+  };
+
   // Delete table
   const deleteTable = async (tableId: string) => {
     if (!activePlan || !confirm('Izbrisati to mizo?')) return;
@@ -283,7 +308,7 @@ export function FloorPlanPage() {
               key={table.id}
               style={getTableStyle(table)}
               onMouseDown={e => handleMouseDown(e, table)}
-              onClick={e => { if (!dragging) { e.stopPropagation(); setSelectedTable(table); setEditOpen(true); } }}
+              onClick={e => { if (!dragging) { e.stopPropagation(); setSelectedTable(table); setEditForm({ label: table.label, minSeats: String(table.minSeats), maxSeats: String(table.maxSeats), shape: table.shape, isVip: table.isVip, isCombinable: table.isCombinable, joinGroup: table.joinGroup || '' }); setEditOpen(true); } }}
               className={`
                 flex flex-col items-center justify-center border-2 select-none z-10
                 ${selectedTable?.id === table.id ? 'border-brand-500 shadow-lg shadow-brand-200/50' : 'border-gray-300'}
@@ -309,27 +334,39 @@ export function FloorPlanPage() {
       )}
 
       {/* Edit table modal */}
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title={`Miza ${selectedTable?.label || ''}`}>
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title={`Uredi mizo ${selectedTable?.label || ''}`}>
         {selectedTable && (
           <div className="space-y-4">
+            <Input label="Oznaka *" value={editForm.label} onChange={e => setEditForm(f => ({ ...f, label: e.target.value }))} placeholder="npr. T1, Terasa 3" />
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-400">Kapaciteta</p>
-                <p className="text-sm font-medium">{selectedTable.minSeats} - {selectedTable.maxSeats} sedežev</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-400">Oblika</p>
-                <p className="text-sm font-medium capitalize">{selectedTable.shape}</p>
-              </div>
+              <Input label="Min. sedežev" type="number" value={editForm.minSeats} onChange={e => setEditForm(f => ({ ...f, minSeats: e.target.value }))} />
+              <Input label="Max. sedežev" type="number" value={editForm.maxSeats} onChange={e => setEditForm(f => ({ ...f, maxSeats: e.target.value }))} />
             </div>
-            <div className="flex gap-2 flex-wrap">
-              {selectedTable.isVip && <Badge variant="warning">VIP</Badge>}
-              {selectedTable.isCombinable && <Badge variant="info">Združljiva</Badge>}
-              {selectedTable.joinGroup && <Badge variant="default">Skupina: {selectedTable.joinGroup}</Badge>}
+            <Select
+              label="Oblika"
+              value={editForm.shape}
+              onChange={e => setEditForm(f => ({ ...f, shape: e.target.value }))}
+              options={[
+                { value: 'square', label: 'Kvadrat' },
+                { value: 'round', label: 'Okrogla' },
+                { value: 'rectangle', label: 'Pravokotnik' },
+              ]}
+            />
+            <Input label="Združevalna skupina" value={editForm.joinGroup} onChange={e => setEditForm(f => ({ ...f, joinGroup: e.target.value }))} placeholder="npr. main-A (neobvezno)" />
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={editForm.isVip} onChange={e => setEditForm(f => ({ ...f, isVip: e.target.checked }))} className="w-4 h-4 rounded" />
+                VIP miza
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={editForm.isCombinable} onChange={e => setEditForm(f => ({ ...f, isCombinable: e.target.checked }))} className="w-4 h-4 rounded" />
+                Združljiva
+              </label>
             </div>
-            <div className="flex gap-2 pt-2">
-              <Button variant="danger" size="sm" onClick={() => deleteTable(selectedTable.id)}>Izbriši mizo</Button>
-              <Button variant="secondary" onClick={() => setEditOpen(false)} className="flex-1">Zapri</Button>
+            <div className="flex gap-2 pt-2 border-t border-gray-100">
+              <Button variant="danger" size="sm" onClick={() => deleteTable(selectedTable.id)}>Izbriši</Button>
+              <Button variant="secondary" onClick={() => setEditOpen(false)} className="flex-1">Prekliči</Button>
+              <Button onClick={saveTable} loading={editLoading} className="flex-[2]">Shrani</Button>
             </div>
           </div>
         )}

@@ -52,6 +52,35 @@ router.get('/stats', async (req: AuthRequest, res: Response, next: NextFunction)
 });
 
 // GET /api/v1/reservations/timeline?date=YYYY-MM-DD
+// GET /api/v1/reservations/calendar?year=2025&month=3
+router.get('/calendar', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    const month = parseInt(req.query.month as string) || new Date().getMonth() + 1;
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1);
+
+    const reservations = await prisma.reservation.findMany({
+      where: { tenantId, date: { gte: start, lt: end } },
+      include: { guest: { select: { name: true } }, tables: { include: { table: { select: { label: true } } } } },
+      orderBy: { time: 'asc' },
+    });
+
+    // Group by date
+    const byDate: Record<string, any> = {};
+    for (const r of reservations) {
+      const dateStr = r.date.toISOString().split('T')[0];
+      if (!byDate[dateStr]) byDate[dateStr] = { count: 0, guests: 0, reservations: [] };
+      byDate[dateStr].count++;
+      byDate[dateStr].guests += r.partySize ?? 0;
+      byDate[dateStr].reservations.push(r);
+    }
+
+    res.status(200).json({ data: byDate });
+  } catch (err) { next(err); }
+});
+
 router.get('/timeline', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenantId;

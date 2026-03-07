@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/auth';
 import { Badge, Button } from '@/components/ui';
 import { NewReservationModal } from '@/components/reservations/NewReservationModal';
+import { EditReservationModal } from '@/components/reservations/EditReservationModal';
 
 interface Reservation {
   id: string;
@@ -39,6 +40,8 @@ export function ReservationsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [filter, setFilter] = useState<string>('all');
+  const [editOpen, setEditOpen] = useState(false);
+  const [editReservation, setEditReservation] = useState<Reservation | null>(null);
 
   const fetchTimeline = async () => {
     setLoading(true);
@@ -237,6 +240,10 @@ export function ReservationsPage() {
                             {isActive && (
                               <>
                                 <button
+                                  onClick={() => { setEditReservation(r); setEditOpen(true); }}
+                                  className="px-2.5 py-1.5 rounded-md text-gray-400 text-[11px] font-medium hover:bg-gray-50 hover:text-blue-500 transition-colors"
+                                >Uredi</button>
+                                <button
                                   onClick={() => updateStatus(r.id, 'NO_SHOW')}
                                   disabled={actionLoading === r.id}
                                   className="px-2.5 py-1.5 rounded-md text-gray-400 text-[11px] font-medium hover:bg-gray-50 hover:text-red-500 transition-colors disabled:opacity-50"
@@ -260,6 +267,7 @@ export function ReservationsPage() {
         )}
 
         <NewReservationModal open={newOpen} onClose={() => setNewOpen(false)} onCreated={fetchTimeline} defaultDate={date} />
+        <EditReservationModal open={editOpen} reservation={editReservation} onClose={() => { setEditOpen(false); setEditReservation(null); }} onUpdated={fetchTimeline} />
       </div>
     </div>
   );

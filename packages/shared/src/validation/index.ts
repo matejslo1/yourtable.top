@@ -63,7 +63,7 @@ export const updateFloorPlanSchema = createFloorPlanSchema.partial();
 
 // ---- Table ----
 
-export const createTableSchema = z.object({
+const createTableBaseSchema = z.object({
   floorPlanId: z.string().uuid(),
   label: z.string().min(1).max(50),
   minSeats: z.number().int().min(1).max(50),
@@ -77,25 +77,14 @@ export const createTableSchema = z.object({
   shape: z.enum(['square', 'round', 'rectangle']).default('square'),
   isCombinable: z.boolean().default(false),
   isVip: z.boolean().default(false),
-}).refine(data => data.maxSeats >= data.minSeats, {
+});
+
+export const createTableSchema = createTableBaseSchema.refine(data => data.maxSeats >= data.minSeats, {
   message: 'maxSeats must be >= minSeats',
   path: ['maxSeats'],
 });
 
-export const updateTableSchema = z.object({
-  label: z.string().min(1).max(50).optional(),
-  minSeats: z.number().int().min(1).max(50).optional(),
-  maxSeats: z.number().int().min(1).max(50).optional(),
-  joinGroup: z.string().max(50).nullable().optional(),
-  joinPriority: z.number().int().min(0).optional(),
-  positionX: z.number().min(0).optional(),
-  positionY: z.number().min(0).optional(),
-  width: z.number().min(20).optional(),
-  height: z.number().min(20).optional(),
-  shape: z.enum(['square', 'round', 'rectangle']).optional(),
-  isCombinable: z.boolean().optional(),
-  isVip: z.boolean().optional(),
-});
+export const updateTableSchema = createTableBaseSchema.partial().omit({ floorPlanId: true });
 
 // ---- Table Adjacency ----
 
@@ -125,6 +114,11 @@ export const updateGuestSchema = createGuestSchema.partial();
 
 export const createReservationSchema = z.object({
   guestId: z.string().uuid().optional(),
+  // Inline guest creation (when guestId not provided)
+  guestName: z.string().min(1).max(255).optional(),
+  guestEmail: z.string().email().optional(),
+  guestPhone: z.string().max(50).optional(),
+  // Reservation fields
   date: dateSchema,
   time: timeSchema,
   durationMinutes: z.number().int().min(15).max(480).default(90),
@@ -134,7 +128,10 @@ export const createReservationSchema = z.object({
   notes: z.string().max(1000).nullable().optional(),
   internalNotes: z.string().max(2000).nullable().optional(),
   tableIds: z.array(z.string().uuid()).optional(),
-});
+}).refine(
+  data => data.guestId || data.guestName,
+  { message: 'Either guestId or guestName is required', path: ['guestId'] }
+);
 
 export const updateReservationSchema = z.object({
   date: dateSchema.optional(),
@@ -162,7 +159,7 @@ export const createHoldSchema = z.object({
 
 export const completeHoldSchema = z.object({
   guestName: z.string().min(1).max(255),
-  guestEmail: z.string().email().or(z.string().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Invalid email address')),
+  guestEmail: z.string().email(),
   guestPhone: z.string().max(50).optional(),
   notes: z.string().max(1000).optional(),
   sessionToken: z.string(),

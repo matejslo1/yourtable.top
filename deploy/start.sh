@@ -8,7 +8,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # Run Prisma migrations with a timeout so it never hangs
 echo "[1/4] Running database migrations..."
 cd /app/packages/api
-timeout 20 npx prisma migrate deploy || echo "⚠️  Migration skipped or timed out — continuing"
+timeout 30 ./node_modules/.bin/prisma migrate deploy || echo "⚠️  Migration skipped or timed out — continuing"
 
 # Start API server in background
 echo "[2/4] Starting API server on port 3001..."

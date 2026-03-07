@@ -70,6 +70,7 @@ model User {
 }
 
 enum UserRole {
+  superadmin
   owner
   admin
   manager

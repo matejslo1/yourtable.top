@@ -19,6 +19,7 @@ import guestRoutes from './routes/guests.js';
 import waitlistRoutes from './routes/waitlist.js';
 import paymentRoutes from './routes/payments.js';
 import voucherRoutes from './routes/vouchers.js';
+import setupRoutes from './routes/setup.js';
 
 const app = express();
 
@@ -54,6 +55,9 @@ app.use('/api/v1/public/', holdLimiter);
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.1.0', phase: 7 });
 });
+
+// Setup (one-time, protected by SETUP_SECRET header)
+app.use('/api/v1/setup', setupRoutes);
 
 // API Routes (v1) - Authenticated
 app.use('/api/v1/auth', authRoutes);

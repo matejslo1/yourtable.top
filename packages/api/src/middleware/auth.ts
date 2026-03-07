@@ -43,7 +43,7 @@ export async function requireAuth(req: AuthRequest, _res: Response, next: NextFu
     }
 
     if (!user) throw new ForbiddenError('SetupRequired: app user missing (seed required)');
-    if (!user.tenantId) throw new ForbiddenError('SetupRequired: user has no tenantId (seed required)');
+    if (!user.tenantId && (user.role as string) !== 'superadmin') throw new ForbiddenError('SetupRequired: user has no tenantId (seed required)');
 
     req.user = user;
     next();
@@ -61,8 +61,8 @@ export function requireRole(...allowedRoles: string[]) {
       return next(new UnauthorizedError('Missing auth context (requireAuth must run first)'));
     }
 
-    // admin always allowed
-    if (role === 'admin') return next();
+    // superadmin and admin always allowed
+    if (role === 'superadmin' || role === 'admin') return next();
 
     if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
       return next(new UnauthorizedError('Insufficient permissions'));

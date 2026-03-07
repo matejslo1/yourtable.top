@@ -31,6 +31,8 @@ FROM deps AS build-shared
 COPY packages/shared/ packages/shared/
 COPY tsconfig.json ./
 RUN pnpm --filter @yourtable/shared build
+# Point shared package.json to compiled dist (not raw .ts sources)
+RUN node -e "const p=require('./packages/shared/package.json');p.main='./dist/index.js';p.types='./dist/index.d.ts';p.exports={'.':{'import':'./dist/index.js','types':'./dist/index.d.ts'}};require('fs').writeFileSync('./packages/shared/package.json',JSON.stringify(p,null,2))"
 
 # ──────────────────────────────────────────────
 # Stage 4: Build API

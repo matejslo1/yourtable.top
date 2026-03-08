@@ -184,7 +184,7 @@ export function FloorPlanPage() {
     setEditLoading(true);
     try {
       await apiFetch(`/api/v1/floor-plans/${activePlan}/tables/${selectedTable.id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         body: JSON.stringify({
           label: editForm.label,
           minSeats: parseInt(editForm.minSeats),

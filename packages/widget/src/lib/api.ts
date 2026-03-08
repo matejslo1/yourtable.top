@@ -21,6 +21,7 @@ async function api<T>(tenantSlug: string, path: string, options: ApiOptions = {}
       const err = new Error(json.message || 'Ni prostih miz') as any;
       err.code = 'NO_TABLES';
       err.canWaitlist = json.canWaitlist;
+      err.alternatives = json.alternatives || [];
       throw err;
     }
     const details = json.details

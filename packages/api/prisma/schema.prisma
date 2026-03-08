@@ -295,6 +295,7 @@ model SeatingConfig {
   maxPartySize        Int    @default(12) @map("max_party_size")
   minAdvanceHours     Int    @default(2) @map("min_advance_hours")
   maxAdvanceDays      Int    @default(60) @map("max_advance_days")
+  waitlistEnabled     Boolean @default(false) @map("waitlist_enabled")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 

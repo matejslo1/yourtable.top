@@ -1,0 +1,181 @@
+YOURTABLE — PRODUCT ROADMAP & GAP ANALIZA
+==========================================
+Marec 2026
+
+
+1. OBSTOJEČE FUNKCIONALNOSTI
+-----------------------------
+✅ Rezervacijski core         HOLD→CONFIRMED→SEATED→COMPLETED, audit trail
+✅ Algoritem za mize          Scoring engine, kombiniranje miz, adjacency pravila
+✅ Floor plan urejevalnik     Drag & drop, oblike miz, VIP flag
+✅ Delovni čas                Po dnevih + special dates, slot duration
+✅ Email notifikacije         Potrditev, opomnik, odpoved (Resend API)
+✅ Voucher sistem             Digitalni/fizični, QR, PDF, expiry job
+✅ Booking widget             Embeddable, multi-step, hold mehanizem
+✅ Auth & Roles               Supabase, owner/admin/manager/staff
+⚠️  Guest CRM                 Osnova (tags, notes, visitCount) — manjka VIP/preferences
+⚠️  Čakalna lista             Model OK, auto-offer job ni implementiran
+⚠️  Plačila / Stripe          Osnova — manjka deposit engine
+⚠️  Dashboard                 KPI danes — manjka analytics za managerja
+❌  SMS kanal                 Model obstaja, implementacija manjka
+❌  Realtime posodabljanje    Supabase Realtime ni aktiviran
+❌  Permissions UI            permissions JSON polje obstaja, UI manjka
+❌  Analytics / Export        Ni poročil, ni CSV/PDF izvoza
+
+
+2. GAP ANALIZA PO EKRANIH
+--------------------------
+
+DASHBOARD
+  Ima:    KPI danes, timeline, 7/30-dnevni stats
+  Manjka: Revenue per seat, occupancy heatmap, forecasting, CSV izvoz
+  Prio:   🔴 VISOKA
+
+RESERVATIONS
+  Ima:    Seznam, filtriranje, new/edit modal, status prehodi
+  Manjka: Live floor host mode, drag & drop na mizo, one-click seated/no-show,
+          walk-in quick seat, merge/split, turn-time alert, overbooking warning
+  Prio:   🔴 VISOKA
+
+FLOOR PLAN
+  Ima:    Urejevalnik tlorisa, oblike miz, VIP flag
+  Manjka: Realtime status miz (zelena/rdeča), hover tooltip z gostom,
+          animirani turnover timer
+  Prio:   🔴 VISOKA
+
+GUESTS (CRM)
+  Ima:    Osnova — tags, notes, visitCount, blacklist
+  Manjka: VIP nivoji, preference profil (najljubša miza, alergije, obletnice),
+          history timeline, auto-tags, LTV score, house notes na kartici
+  Prio:   🟡 SREDNJA
+
+WAITLIST
+  Ima:    Waiting→offered→accepted→expired, prioriteta
+  Manjka: Auto-offer job, SMS notifikacija za offer, widget inline fallback
+  Prio:   🟡 SREDNJA
+
+KOMUNIKACIJA
+  Ima:    Email potrditev, opomnik job, odpoved
+  Manjka: SMS (Twilio), 24h + 3h reminder, auto-release nepotrjenih,
+          review request po obisku, guest self-service link
+  Prio:   🔴 VISOKA
+
+BOOKING WIDGET
+  Ima:    Multi-step, hold mehanizem, waitlist fallback
+  Manjka: Izbira območja (terasa/VIP/bar), special occasion, deposit step,
+          white-label theming, Google autofill, conversion analytics
+  Prio:   🔴 VISOKA
+
+PAYMENTS
+  Ima:    Stripe integracija, deposit/cancellation/no-show polja
+  Manjka: Deposit konfiguracija per slot/day/party size, card hold,
+          partial refund pravila, event pricing
+  Prio:   🟡 SREDNJA
+
+SETTINGS
+  Ima:    SeatingConfig, delovni čas, special dates
+  Manjka: Integrations hub, email template urejevalnik,
+          shift/service period management, permissions UI
+  Prio:   🟡 SREDNJA
+
+ANALYTICS (novo)
+  Ima:    —
+  Manjka: Revenue per seat, occupancy %, booking source conversion,
+          no-show analiza, table efficiency, heatmap, forecasting, izvoz
+  Prio:   🟡 SREDNJA
+
+
+3. TOP 5 — NAJVEČJI ROI
+------------------------
+1. Live Floor / Host Mode        → Operativna hitrost ×3, manj napak
+2. Guest CRM 2.0 + Preferences   → Iz orodja v platformo, sticky produkt
+3. Deposit / No-Show Protection  → No-show ↓40–60%, fine dining nujnost
+4. Automated Messaging           → No-show ↓30%, fill rate ↑, ROI takoj viden
+5. Best-in-Class Booking Widget  → Direktni booking brez provizij
+
+
+4. FEATURE ROADMAP
+-------------------
+
+── FAZA 1 — Product-Market Fit (6–10 tednov) ──────────────────────────────────
+
+Live Floor / Host Mode                                              [Effort: L]
+  Kaj: Realtime tloris z barvnimi statusi, drag & drop rezervacije,
+       one-click seated/completed/no-show, turn-time alert,
+       overbooking warning, walk-in quick seat
+  Schema: Aktiviraj Supabase Realtime na reservations + tables
+
+Avtomatski opomniki — SMS + Email                                   [Effort: M]
+  Kaj: 24h + 3h opomnik, auto-release nepotrjenih, confirm-with-one-click
+  Schema: Implementiraj Twilio SMS. Razširi reminderJob. Dodaj confirmToken.
+
+Deposit / Card Guarantee                                            [Effort: M]
+  Kaj: Konfiguracija depozita per slot/day/party size, card hold,
+       auto-charge za no-show, partial refund pravila
+  Schema: Nov DepositPolicy model. Stripe payment intents (capture later).
+
+Guest Self-Service Link                                             [Effort: S]
+  Kaj: Magic link v emailu → guest portal: potrdi, uredi, odpovej
+  Schema: Nov GuestToken model (token, reservationId, expiresAt).
+
+Boljši Booking Widget                                               [Effort: M]
+  Kaj: Izbira območja, special occasion, white-label CSS, deposit step
+  Schema: Razširi widget props. Dodaj area filter na /public/availability.
+
+
+── FAZA 2 — B2B Value (8–12 tednov) ───────────────────────────────────────────
+
+Guest CRM 2.0                                                       [Effort: M]
+  Kaj: VIP nivoji, preference profil, history timeline, auto-tags, LTV score
+  Schema: Razširi Guest model: vipLevel, preferences JSON, ltv Decimal.
+
+Analytics Dashboard                                                 [Effort: L]
+  Kaj: Revenue per seat, occupancy, heatmap, forecasting, CSV/PDF izvoz
+  Schema: Nov /api/v1/analytics. Materialized views.
+
+Waitlist Avtomatizacija                                             [Effort: S]
+  Kaj: Auto-offer po prioriteti, SMS offer z accept linkom
+  Schema: Razširi waitlistService. Dodaj waitlistOfferJob.
+
+Granular Permissions UI                                             [Effort: M]
+  Kaj: UI za permissions po vlogah, audit log viewer, PIN za iPad
+  Schema: permissions JSON že obstaja. Dodaj PermissionTemplate.
+
+Review & Follow-up                                                  [Effort: S]
+  Kaj: Auto email 2h po COMPLETED, birthday kampanje, "we miss you"
+  Schema: Razširi notificationService. Nov reviewFollowupJob.
+
+Shift / Service Period Management                                   [Effort: M]
+  Kaj: ServicePeriod (kosilo/večerja) z ločenimi kapacitetami in politikami
+  Schema: Nov ServicePeriod model. Razširi OperatingHours.
+
+
+── FAZA 3 — Diferenciacija (12+ tednov) ────────────────────────────────────────
+
+AI Asistent za Host/Team                                            [Effort: L]
+  Kaj: AI seating suggestions, no-show risk score, shift summary, anomaly alerts
+  Schema: Claude API integracija. Nov AiInsight model.
+
+Multi-Location / Group Accounts                                     [Effort: XL]
+  Kaj: Več lokacij pod enim računom, central reporting, shared guest DB
+  Schema: Nov Group model (parent za Tenant).
+
+POS Integracija                                                     [Effort: XL]
+  Kaj: Spend sync z rezervacijo, spend per guest, upsell analytics
+  Schema: Nov POSTransaction model. Webhook za Square/Lightspeed.
+
+Events / Private Dining                                             [Effort: L]
+  Kaj: Event tipi, zaprtje restavracije, prepaid packages
+  Schema: Nov Event model z relacijo na Reservation.
+
+Loyalty Program                                                     [Effort: L]
+  Kaj: Points/perks, tier rewards, invite-back kampanje
+  Schema: Nov LoyaltyAccount, LoyaltyTransaction.
+
+
+EFFORT LEGENDA
+--------------
+S  = 1–2 tedna
+M  = 2–4 tedne
+L  = 4–8 tednov
+XL = 8+ tednov

@@ -117,6 +117,7 @@ router.get('/:tenantSlug/config', async (req: Request, res: Response, next: Next
       minAdvanceHours: tenant.seatingConfig?.minAdvanceHours ?? 2,
       maxAdvanceDays: tenant.seatingConfig?.maxAdvanceDays ?? 60,
       holdTtlSeconds: tenant.seatingConfig?.holdTtlSeconds ?? 420,
+      waitlistEnabled: tenant.seatingConfig?.waitlistEnabled ?? false,
     });
   } catch (err) {
     next(err);

@@ -32,6 +32,7 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
   const [error, setError] = useState<string | null>(null);
   const [guestName, setGuestName] = useState('');
   const [alternatives, setAlternatives] = useState<string[]>([]);
+  const [canWaitlist, setCanWaitlist] = useState(false);
 
   // Fetch availability when date or party size changes
   useEffect(() => {
@@ -77,12 +78,14 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
     } catch (err: any) {
       if (err.code === 'NO_TABLES') {
         // No tables available — show waitlist prompt
-        setAlternatives(availability?.alternatives || []);
+        setCanWaitlist(!!err.canWaitlist);
+        setAlternatives(err.alternatives || availability?.alternatives || []);
         setStep('no-tables');
+        // NOTE: Do NOT null selectedTime here — WaitlistPrompt needs it
       } else {
         setError(err.message || 'Termin ni več na voljo');
+        setSelectedTime(null);
       }
-      setSelectedTime(null);
     } finally {
       setLoadingHold(false);
     }
@@ -217,6 +220,7 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
               time={selectedTime}
               partySize={partySize}
               alternatives={alternatives}
+              canWaitlist={canWaitlist}
               onSelectAlternative={handleAlternative}
               onJoinWaitlist={handleJoinWaitlist}
               onCancel={handleCancel}
@@ -248,7 +252,7 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
             <div className="yt-text-center yt-py-6 yt-animate-fade-in">
               <div className="yt-w-16 yt-h-16 yt-mx-auto yt-mb-4 yt-rounded-full yt-bg-emerald-50 yt-flex yt-items-center yt-justify-center">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="yt-text-emerald-500">
-                  <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
               <h3 className="yt-font-display yt-text-xl yt-font-bold yt-text-gray-900 yt-mb-1">Na čakalni vrsti!</h3>

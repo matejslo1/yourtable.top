@@ -11,14 +11,14 @@ const DEFAULT_HOURS: OperatingHour[] = [
   { dayOfWeek: 3, openTime: '12:00', closeTime: '23:00', lastReservation: '22:00', isClosed: false, slotDurationMin: 30 },
   { dayOfWeek: 4, openTime: '12:00', closeTime: '23:00', lastReservation: '22:00', isClosed: false, slotDurationMin: 30 },
   { dayOfWeek: 5, openTime: '12:00', closeTime: '23:59', lastReservation: '23:00', isClosed: false, slotDurationMin: 30 },
-  { dayOfWeek: 6, openTime: '12:00', closeTime: '23:00', lastReservation: '22:00', isClosed: true,  slotDurationMin: 30 },
+  { dayOfWeek: 6, openTime: '12:00', closeTime: '23:00', lastReservation: '22:00', isClosed: true, slotDurationMin: 30 },
 ];
 
 interface OperatingHour {
   dayOfWeek: number; openTime: string; closeTime: string; lastReservation: string; isClosed: boolean; slotDurationMin: number;
 }
 interface SeatingConfig {
-  holdTtlSeconds: number; maxJoinTables: number; autoConfirm: boolean; defaultDurationMin: number; maxPartySize: number; noShowTimeoutMin: number;
+  holdTtlSeconds: number; maxJoinTables: number; autoConfirm: boolean; defaultDurationMin: number; maxPartySize: number; noShowTimeoutMin: number; waitlistEnabled: boolean;
 }
 
 export function SettingsPage() {
@@ -80,9 +80,9 @@ export function SettingsPage() {
   };
 
   const TABS = [
-    { key: 'restaurant' as const, label: 'Restavracija', icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg> },
-    { key: 'hours' as const, label: 'Delovni čas', icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg> },
-    { key: 'seating' as const, label: 'Sedežni red', icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> },
+    { key: 'restaurant' as const, label: 'Restavracija', icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" /></svg> },
+    { key: 'hours' as const, label: 'Delovni čas', icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><circle cx="12" cy="12" r="10" /><polyline points="12,6 12,12 16,14" /></svg> },
+    { key: 'seating' as const, label: 'Sedežni red', icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg> },
   ];
 
   return (
@@ -95,7 +95,7 @@ export function SettingsPage() {
           </div>
           {saved && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-[12px] font-medium">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20,6 9,17 4,12"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20,6 9,17 4,12" /></svg>
               Shranjeno
             </div>
           )}
@@ -107,9 +107,8 @@ export function SettingsPage() {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors ${
-                tab === t.key ? 'bg-white text-[#1E293B] border border-gray-100' : 'text-gray-400 hover:text-gray-600 hover:bg-white/50'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors ${tab === t.key ? 'bg-white text-[#1E293B] border border-gray-100' : 'text-gray-400 hover:text-gray-600 hover:bg-white/50'
+                }`}
               style={tab === t.key ? { boxShadow: '0 1px 4px rgba(0,0,0,0.04)' } : undefined}
             >
               <span className={tab === t.key ? 'text-emerald-500' : ''}>{t.icon}</span>
@@ -121,7 +120,7 @@ export function SettingsPage() {
         {loading ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-8 animate-pulse">
             <div className="h-6 w-40 bg-gray-100 rounded mb-4" />
-            <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-10 bg-gray-50 rounded-lg" />)}</div>
+            <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-10 bg-gray-50 rounded-lg" />)}</div>
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 p-6" style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
@@ -228,6 +227,12 @@ export function SettingsPage() {
                     <label className="flex items-center gap-2.5 cursor-pointer">
                       <input type="checkbox" checked={seating.autoConfirm} onChange={e => updateSeating('autoConfirm', e.target.checked)} className="w-4 h-4 rounded accent-emerald-500" />
                       <span className="text-[13px] text-gray-600">Samodejno potrdi</span>
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input type="checkbox" checked={seating.waitlistEnabled} onChange={e => updateSeating('waitlistEnabled', e.target.checked)} className="w-4 h-4 rounded accent-emerald-500" />
+                      <span className="text-[13px] text-gray-600">Čakalna vrsta (waitlist)</span>
                     </label>
                   </div>
                 </div>

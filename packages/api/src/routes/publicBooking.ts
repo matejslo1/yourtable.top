@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma.js';
 import { createHold, confirmHold, releaseHold } from '../services/holdService.js';
+import { getAvailability } from '../services/availability.js';
 import { addToWaitlist } from '../services/waitlistService.js';
 import { sendConfirmationEmail } from '../services/notificationService.js';
 import { getOccupiedTableIds } from '../services/tableStatus.js';
@@ -136,6 +137,26 @@ router.post('/:tenantSlug/hold', async (req: Request, res: Response, next: NextF
     const candidates = await findTablesForParty(tenant.id, dateObj, time, partySize, duration, config || {});
 
     if (candidates.length === 0) {
+      // Find alternative available times
+      let alternatives: string[] = [];
+      try {
+        const avail = await getAvailability({ tenantId: tenant.id, date: dateObj, partySize });
+        const availableSlots = avail.slots
+          .filter((s: any) => s.available && s.time !== time)
+          .map((s: any) => s.time);
+
+        // Find closest slots to the requested time
+        const [reqH, reqM] = time.split(':').map(Number);
+        const reqMinutes = reqH * 60 + reqM;
+        alternatives = availableSlots
+          .sort((a: string, b: string) => {
+            const [aH, aM] = a.split(':').map(Number);
+            const [bH, bM] = b.split(':').map(Number);
+            return Math.abs(aH * 60 + aM - reqMinutes) - Math.abs(bH * 60 + bM - reqMinutes);
+          })
+          .slice(0, 5);
+      } catch (_) { /* ignore — just won't have alternatives */ }
+
       // No tables available — return 409 with alternatives
       res.status(409).json({
         error: 'NoTablesAvailable',
@@ -144,7 +165,8 @@ router.post('/:tenantSlug/hold', async (req: Request, res: Response, next: NextF
         partySize,
         date,
         time,
-        canWaitlist: true,
+        canWaitlist: config?.waitlistEnabled ?? false,
+        alternatives,
       });
       return;
     }

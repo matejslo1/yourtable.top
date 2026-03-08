@@ -24,7 +24,9 @@ export function NewReservationModal({ open, onClose, onCreated, defaultDate }: N
     internalNotes: '',
   });
   const [loading, setLoading] = useState(false);
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [error, setError] = useState('');
+  const [noTablesError, setNoTablesError] = useState(false);
 
   const update = (field: string, value: string) => setForm(f => ({ ...f, [field]: value }));
 
@@ -34,6 +36,7 @@ export function NewReservationModal({ open, onClose, onCreated, defaultDate }: N
 
     setLoading(true);
     setError('');
+    setNoTablesError(false);
 
     try {
       await apiFetch('/api/v1/reservations', {
@@ -60,9 +63,45 @@ export function NewReservationModal({ open, onClose, onCreated, defaultDate }: N
         durationMinutes: '90', source: 'manual', notes: '', internalNotes: '',
       });
     } catch (err: any) {
-      setError(err.message || 'Napaka pri ustvarjanju rezervacije');
+      const message = err.message || 'Napaka pri ustvarjanju rezervacije';
+      setError(message);
+      setNoTablesError(/no tables available|ni prostih miz/i.test(message));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddToWaitlist = async () => {
+    if (!form.guestName.trim() || !form.date || !form.time) {
+      setError('Za čakalno vrsto izpolnite ime, datum in čas.');
+      return;
+    }
+
+    setWaitlistLoading(true);
+    try {
+      await apiFetch('/api/v1/waitlist', {
+        method: 'POST',
+        body: JSON.stringify({
+          guestName: form.guestName,
+          guestEmail: form.guestEmail || undefined,
+          guestPhone: form.guestPhone || undefined,
+          date: form.date,
+          time: form.time,
+          partySize: parseInt(form.partySize),
+        }),
+      });
+
+      onCreated();
+      onClose();
+      setForm({
+        guestName: '', guestEmail: '', guestPhone: '',
+        date: defaultDate || today, time: '19:00', partySize: '2',
+        durationMinutes: '90', source: 'manual', notes: '', internalNotes: '',
+      });
+    } catch (err: any) {
+      setError(err.message || 'Napaka pri dodajanju na čakalno vrsto');
+    } finally {
+      setWaitlistLoading(false);
     }
   };
 
@@ -72,6 +111,13 @@ export function NewReservationModal({ open, onClose, onCreated, defaultDate }: N
         {error && (
           <div className="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
             {error}
+            {noTablesError && (
+              <div className="mt-3">
+                <Button size="sm" variant="secondary" onClick={handleAddToWaitlist} loading={waitlistLoading}>
+                  Dodaj na čakalno vrsto
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

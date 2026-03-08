@@ -16,6 +16,14 @@ interface Table {
   isCombinable: boolean;
   joinGroup: string | null;
   isActive: boolean;
+  isOccupied?: boolean;
+  reservation?: {
+    reservationId: string;
+    guestName: string;
+    partySize: number;
+    time: string;
+    status: string;
+  } | null;
 }
 
 interface FloorPlan {
@@ -29,6 +37,12 @@ interface Adjacency {
   tableBId: string;
   canJoin: boolean;
   joinMaxSeats: number | null;
+}
+
+interface LiveTableStatus {
+  id: string;
+  isOccupied: boolean;
+  reservation: Table['reservation'];
 }
 
 export function FloorPlanPage() {
@@ -52,6 +66,9 @@ export function FloorPlanPage() {
   const [editLoading, setEditLoading] = useState(false);
   const [adjMode, setAdjMode] = useState(false);
   const [adjFirstTable, setAdjFirstTable] = useState<string | null>(null);
+  const [liveView, setLiveView] = useState(false);
+  const [liveDate, setLiveDate] = useState(new Date().toISOString().slice(0, 10));
+  const [liveTime, setLiveTime] = useState(new Date().toTimeString().slice(0, 5));
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const fetchFloorPlans = async () => {
@@ -70,6 +87,38 @@ export function FloorPlanPage() {
   };
 
   useEffect(() => { fetchFloorPlans(); }, []);
+
+  const applyLiveStatuses = (rows: LiveTableStatus[]) => {
+    const byId = new Map(rows.map(r => [r.id, r]));
+    setFloorPlans(prev => prev.map(fp => ({
+      ...fp,
+      tables: fp.tables.map(t => {
+        const live = byId.get(t.id);
+        if (!live) return { ...t, isOccupied: false, reservation: null };
+        return {
+          ...t,
+          isOccupied: live.isOccupied,
+          reservation: live.reservation || null,
+        };
+      }),
+    })));
+  };
+
+  const fetchLiveStatuses = useCallback(async () => {
+    try {
+      const res = await apiFetch<{ data: LiveTableStatus[] }>(`/api/v1/reservations/available-tables?date=${liveDate}&time=${liveTime}&duration=90`);
+      applyLiveStatuses(res.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [liveDate, liveTime]);
+
+  useEffect(() => {
+    if (!liveView) return;
+    fetchLiveStatuses();
+    const id = window.setInterval(fetchLiveStatuses, 30000);
+    return () => window.clearInterval(id);
+  }, [liveView, fetchLiveStatuses]);
 
   const switchPlan = async (id: string) => {
     setActivePlan(id);
@@ -269,6 +318,16 @@ export function FloorPlanPage() {
           <p className="text-sm text-gray-500 mt-0.5">Povlecite mize za premikanje, kliknite za urejanje</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant={liveView ? 'primary' : 'secondary'} onClick={() => setLiveView(v => !v)}>
+            {liveView ? 'Live view: vklopljen' : 'Live view'}
+          </Button>
+          {liveView && (
+            <>
+              <input type="date" value={liveDate} onChange={e => setLiveDate(e.target.value)} className="px-2 py-2 rounded-lg border border-gray-200 text-sm" />
+              <input type="time" value={liveTime} onChange={e => setLiveTime(e.target.value)} className="px-2 py-2 rounded-lg border border-gray-200 text-sm" />
+              <Button variant="secondary" onClick={fetchLiveStatuses}>Osveži</Button>
+            </>
+          )}
           <Button variant="secondary" onClick={() => setNewPlanOpen(true)}>+ Nov tloris</Button>
           {activePlan && (
             <Button
@@ -380,14 +439,26 @@ export function FloorPlanPage() {
                 flex flex-col items-center justify-center border-2 select-none z-10 transition-all
                 ${isAdjFirst ? 'border-amber-400 shadow-lg shadow-amber-200/50 bg-amber-50' :
                   isAdjLinked ? 'border-emerald-400 bg-emerald-50' :
+                  liveView && table.isOccupied ? 'border-red-300 bg-red-50' :
                   table.isVip ? 'bg-amber-50 border-amber-300' :
                   selectedTable?.id === table.id && !adjMode ? 'border-brand-500 shadow-lg shadow-brand-200/50 bg-white' :
                   'bg-white border-gray-300'}
                 hover:shadow-md
               `}
+              title={liveView
+                ? (table.isOccupied
+                  ? `Zasedena: ${table.reservation?.guestName || 'Gost'} (${table.reservation?.partySize || 0}) ob ${table.reservation?.time || liveTime}`
+                  : `Prosta miza ${table.label}`)
+                : `Miza ${table.label}: klik za urejanje, povleci za premik`}
             >
               <span className="text-xs font-bold text-gray-800">{table.label}</span>
               <span className="text-[10px] text-gray-400">{table.minSeats}-{table.maxSeats}</span>
+              {liveView && table.isOccupied && (
+                <>
+                  <span className="text-[10px] font-semibold text-red-600">{table.reservation?.guestName || 'Rezervacija'}</span>
+                  <span className="text-[9px] text-red-500">{table.reservation?.partySize || 0} gostov</span>
+                </>
+              )}
               {table.isVip && <span className="text-[9px] text-amber-600 font-semibold">VIP</span>}
             </div>
             );

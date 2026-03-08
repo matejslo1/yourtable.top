@@ -134,9 +134,10 @@ export function VouchersPage() {
     if (!redeemAmount) { alert('Vnesite znesek'); return; }
     setRedeemLoading(true);
     try {
+      const normalizedAmount = redeemAmount.replace(',', '.').trim();
       await apiFetch('/api/v1/vouchers/redeem', {
         method: 'POST',
-        body: JSON.stringify({ code: redeemCode.trim(), amount: redeemAmount }),
+        body: JSON.stringify({ code: redeemCode.trim(), amount: normalizedAmount }),
       });
       setRedeemOpen(false);
       setRedeemCode('');

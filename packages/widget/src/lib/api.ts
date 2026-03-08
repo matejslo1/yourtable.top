@@ -43,6 +43,7 @@ export interface WidgetConfig {
   maxPartySize: number;
   holdTtlSeconds: number;
   bookingWidgetEnabled: boolean;
+  waitlistEnabled?: boolean;
 }
 
 export function fetchConfig(slug: string): Promise<WidgetConfig> {

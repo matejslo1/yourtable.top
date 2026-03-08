@@ -182,7 +182,7 @@ router.post('/redeem', async (req: AuthRequest, res: Response, next: NextFunctio
   try {
     const tenantId = req.user!.tenantId;
     const { code, amount, notes } = req.body;
-    if (!code || !amount) { res.status(400).json({ error: 'code and amount required' }); return; }
+    if (!code || amount === undefined || amount === null) { res.status(400).json({ error: 'code and amount required' }); return; }
 
     const voucher = await prisma.voucher.findUnique({
       where: { tenantId_code: { tenantId, code: code.toUpperCase().trim() } },
@@ -190,9 +190,18 @@ router.post('/redeem', async (req: AuthRequest, res: Response, next: NextFunctio
 
     if (!voucher) { res.status(404).json({ error: 'Bon ne obstaja' }); return; }
     if (voucher.status !== 'active') { res.status(400).json({ error: `Bon ni aktiven (${voucher.status})` }); return; }
+    if (voucher.validUntil < new Date()) { res.status(400).json({ error: 'Bon je potekel' }); return; }
+
+    const parsedAmount = typeof amount === 'number'
+      ? amount
+      : Number(String(amount).replace(',', '.').trim());
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      res.status(400).json({ error: 'Neveljaven znesek za unovčenje' });
+      return;
+    }
 
     const remaining = Number(voucher.remainingValue);
-    const redeemAmount = Math.min(parseFloat(amount), remaining);
+    const redeemAmount = Math.min(parsedAmount, remaining);
     if (redeemAmount <= 0) { res.status(400).json({ error: 'Na bonu ni več sredstev' }); return; }
 
     const newRemaining = Math.max(0, remaining - redeemAmount);

@@ -6,7 +6,7 @@ import { GuestForm } from './GuestForm';
 import { SuccessScreen } from './SuccessScreen';
 import { WaitlistPrompt } from './WaitlistPrompt';
 import {
-  fetchAvailability, createHold, completeHold, abandonHold, joinWaitlist,
+  fetchAvailability, createHold, completeHold, abandonHold, joinWaitlist, fetchConfig,
   type DayAvailability, type HoldResponse,
 } from '../lib/api';
 
@@ -33,6 +33,13 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
   const [guestName, setGuestName] = useState('');
   const [alternatives, setAlternatives] = useState<string[]>([]);
   const [canWaitlist, setCanWaitlist] = useState(false);
+  const [waitlistEnabledConfig, setWaitlistEnabledConfig] = useState(false);
+
+  useEffect(() => {
+    fetchConfig(tenantSlug)
+      .then(cfg => setWaitlistEnabledConfig(!!cfg.waitlistEnabled))
+      .catch(() => setWaitlistEnabledConfig(false));
+  }, [tenantSlug]);
 
   // Fetch availability when date or party size changes
   useEffect(() => {
@@ -76,9 +83,10 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
       setHold(holdData);
       setStep('form');
     } catch (err: any) {
-      if (err.code === 'NO_TABLES') {
+      const noTables = err.code === 'NO_TABLES' || /no tables available|ni prostih miz/i.test(err.message || '');
+      if (noTables) {
         // No tables available — show waitlist prompt
-        setCanWaitlist(!!err.canWaitlist);
+        setCanWaitlist(err.canWaitlist ?? waitlistEnabledConfig);
         setAlternatives(err.alternatives || availability?.alternatives || []);
         setStep('no-tables');
         // NOTE: Do NOT null selectedTime here — WaitlistPrompt needs it
@@ -89,7 +97,7 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
     } finally {
       setLoadingHold(false);
     }
-  }, [selectedDate, partySize, tenantSlug, availability]);
+  }, [selectedDate, partySize, tenantSlug, availability, waitlistEnabledConfig]);
 
   // Handle alternative time selection
   const handleAlternative = useCallback(async (time: string) => {
@@ -274,3 +282,4 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
     </div>
   );
 }
+

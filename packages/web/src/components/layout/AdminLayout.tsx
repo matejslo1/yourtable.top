@@ -274,7 +274,7 @@ export function AdminLayout() {
                           if (!collapsed && hasSub) toggleExpand(itemKey);
                           navigate(item.to);
                         }}
-                        title={collapsed ? item.label : undefined}
+                        title={item.soon ? `${item.label} (kmalu)` : item.pro ? `${item.label} (Pro)` : item.label}
                       >
                         {isActive && !isDisabled && (
                           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-3.5 bg-emerald-400 rounded-r-full" />
@@ -310,6 +310,7 @@ export function AdminLayout() {
                               <div
                                 key={sub.label}
                                 onClick={() => { if (!subDisabled && sub.to) navigate(sub.to); }}
+                                title={sub.soon ? `${sub.label} (kmalu)` : sub.pro ? `${sub.label} (Pro)` : sub.label}
                                 className={`
                                   flex items-center gap-1.5 px-2 py-[5px] rounded text-[12px] transition-colors
                                   ${subDisabled

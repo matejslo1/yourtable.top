@@ -1,6 +1,6 @@
 import { prisma } from '../utils/prisma.js';
-import { getOccupiedTableIds } from './tableStatus.js';
 import { findOptimalTables, type TableInfo, type AdjacencyInfo, type SeatingRequest } from '@yourtable/shared';
+import { getBlockingStatuses } from '@yourtable/shared';
 
 interface AvailabilityParams {
   tenantId: string;
@@ -118,13 +118,50 @@ export async function getAvailability(params: AvailabilityParams) {
 
   const slots: SlotAvailability[] = [];
   const durationMinutes = config.defaultDurationMin;
+  const blockingStatuses = getBlockingStatuses();
+  const now = new Date();
+
+  const dayReservations = await prisma.reservation.findMany({
+    where: {
+      tenantId,
+      date,
+      status: { in: blockingStatuses as any },
+      OR: [
+        { holdExpiresAt: null },
+        { holdExpiresAt: { gt: now } },
+      ],
+    },
+    select: {
+      time: true,
+      durationMinutes: true,
+      tables: { select: { tableId: true } },
+    },
+  });
+
+  const reservationWindows = dayReservations.map((r) => {
+    const [rh, rm] = r.time.split(':').map(Number);
+    const start = rh * 60 + rm;
+    const end = start + r.durationMinutes;
+    return {
+      start,
+      end,
+      tableIds: r.tables.map((t) => t.tableId),
+    };
+  });
 
   for (let m = openMinutes; m <= lastMinutes; m += slotDuration) {
     const hh = Math.floor(m / 60).toString().padStart(2, '0');
     const mm = (m % 60).toString().padStart(2, '0');
     const time = `${hh}:${mm}`;
+    const slotStart = m;
+    const slotEnd = slotStart + durationMinutes;
 
-    const occupiedIds = await getOccupiedTableIds(tenantId, date, time, durationMinutes);
+    const occupiedIds = new Set<string>();
+    for (const r of reservationWindows) {
+      if (slotStart < r.end && r.start < slotEnd) {
+        for (const tableId of r.tableIds) occupiedIds.add(tableId);
+      }
+    }
     const occupiedCapacity = allTables
       .filter(t => occupiedIds.has(t.id))
       .reduce((sum, t) => sum + t.maxSeats, 0);

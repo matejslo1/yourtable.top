@@ -50,6 +50,8 @@ export function FloorPlanPage() {
   
   const [editForm, setEditForm] = useState({ label: '', minSeats: '2', maxSeats: '4', shape: 'square', isVip: false, isCombinable: false, joinGroup: '' });
   const [editLoading, setEditLoading] = useState(false);
+  const [adjMode, setAdjMode] = useState(false);
+  const [adjFirstTable, setAdjFirstTable] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const fetchFloorPlans = async () => {
@@ -211,6 +213,41 @@ export function FloorPlanPage() {
     } catch (err: any) { alert(err.message); }
   };
 
+  // Adjacency mode click handler
+  const handleAdjClick = async (table: Table) => {
+    if (!adjFirstTable) {
+      setAdjFirstTable(table.id);
+      return;
+    }
+    if (adjFirstTable === table.id) {
+      setAdjFirstTable(null);
+      return;
+    }
+    const existing = adjacency.find(a =>
+      (a.tableAId === adjFirstTable && a.tableBId === table.id) ||
+      (a.tableAId === table.id && a.tableBId === adjFirstTable)
+    );
+    try {
+      if (existing) {
+        await apiFetch(`/api/v1/floor-plans/${activePlan}/adjacency`, {
+          method: 'DELETE',
+          body: JSON.stringify({ tableAId: adjFirstTable, tableBId: table.id }),
+        });
+        setAdjacency(prev => prev.filter(a =>
+          !((a.tableAId === adjFirstTable && a.tableBId === table.id) ||
+            (a.tableAId === table.id && a.tableBId === adjFirstTable))
+        ));
+      } else {
+        const res = await apiFetch<{ data: Adjacency }>(`/api/v1/floor-plans/${activePlan}/adjacency`, {
+          method: 'POST',
+          body: JSON.stringify({ tableAId: adjFirstTable, tableBId: table.id, canJoin: true }),
+        });
+        setAdjacency(prev => [...prev, res.data]);
+      }
+    } catch (err: any) { alert(err.message); }
+    setAdjFirstTable(null);
+  };
+
   // Table shape style
   const getTableStyle = (t: Table): React.CSSProperties => ({
     position: 'absolute',
@@ -233,7 +270,15 @@ export function FloorPlanPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={() => setNewPlanOpen(true)}>+ Nov tloris</Button>
-          {activePlan && <Button onClick={() => setAddOpen(true)}>+ Dodaj mizo</Button>}
+          {activePlan && (
+            <Button
+              variant={adjMode ? 'primary' : 'secondary'}
+              onClick={() => { setAdjMode(m => !m); setAdjFirstTable(null); }}
+            >
+              {adjMode ? '✓ Uredi sosedstvo' : 'Uredi sosedstvo'}
+            </Button>
+          )}
+          {activePlan && !adjMode && <Button onClick={() => setAddOpen(true)}>+ Dodaj mizo</Button>}
         </div>
       </div>
 
@@ -276,6 +321,16 @@ export function FloorPlanPage() {
         <EmptyState icon="🗺️" title="Izberite tloris" />
       ) : (
         /* Canvas */
+        <>
+        {adjMode && (
+          <div className="mb-3 flex-shrink-0 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[13px] text-amber-700 flex items-center gap-2">
+            <span>⚡</span>
+            {adjFirstTable
+              ? <span>Kliknite drugo mizo za <strong>dodajanje</strong> ali <strong>odstranjevanje</strong> sosedstva</span>
+              : <span>Kliknite mizo za izbiro — zelena linija = sosedstvo. Kliknite dve mizi za dodajanje/odstranjevanje.</span>
+            }
+          </div>
+        )}
         <div
           ref={canvasRef}
           className="flex-1 bg-[#f8f9fb] rounded-xl border-2 border-dashed border-gray-200 relative overflow-hidden min-h-[500px]"
@@ -304,24 +359,39 @@ export function FloorPlanPage() {
           </svg>
 
           {/* Tables */}
-          {tables.map(table => (
+          {tables.map(table => {
+            const isAdjFirst = adjMode && adjFirstTable === table.id;
+            const isAdjLinked = adjMode && adjFirstTable && adjacency.some(a =>
+              (a.tableAId === adjFirstTable && a.tableBId === table.id) ||
+              (a.tableAId === table.id && a.tableBId === adjFirstTable)
+            );
+            return (
             <div
               key={table.id}
-              style={getTableStyle(table)}
-              onMouseDown={e => handleMouseDown(e, table)}
-              onClick={e => { if (!dragging) { e.stopPropagation(); setSelectedTable(table); setEditForm({ label: table.label, minSeats: String(table.minSeats), maxSeats: String(table.maxSeats), shape: table.shape, isVip: table.isVip, isCombinable: table.isCombinable, joinGroup: table.joinGroup || '' }); setEditOpen(true); } }}
+              style={{ ...getTableStyle(table), cursor: adjMode ? 'pointer' : (dragging?.id === table.id ? 'grabbing' : 'grab') }}
+              onMouseDown={e => { if (!adjMode) handleMouseDown(e, table); }}
+              onClick={e => {
+                if (dragging) return;
+                e.stopPropagation();
+                if (adjMode) { handleAdjClick(table); }
+                else { setSelectedTable(table); setEditForm({ label: table.label, minSeats: String(table.minSeats), maxSeats: String(table.maxSeats), shape: table.shape, isVip: table.isVip, isCombinable: table.isCombinable, joinGroup: table.joinGroup || '' }); setEditOpen(true); }
+              }}
               className={`
-                flex flex-col items-center justify-center border-2 select-none z-10
-                ${selectedTable?.id === table.id ? 'border-brand-500 shadow-lg shadow-brand-200/50' : 'border-gray-300'}
-                ${table.isVip ? 'bg-amber-50 border-amber-400' : 'bg-white'}
-                hover:shadow-md hover:border-gray-400
+                flex flex-col items-center justify-center border-2 select-none z-10 transition-all
+                ${isAdjFirst ? 'border-amber-400 shadow-lg shadow-amber-200/50 bg-amber-50' :
+                  isAdjLinked ? 'border-emerald-400 bg-emerald-50' :
+                  table.isVip ? 'bg-amber-50 border-amber-300' :
+                  selectedTable?.id === table.id && !adjMode ? 'border-brand-500 shadow-lg shadow-brand-200/50 bg-white' :
+                  'bg-white border-gray-300'}
+                hover:shadow-md
               `}
             >
               <span className="text-xs font-bold text-gray-800">{table.label}</span>
               <span className="text-[10px] text-gray-400">{table.minSeats}-{table.maxSeats}</span>
               {table.isVip && <span className="text-[9px] text-amber-600 font-semibold">VIP</span>}
             </div>
-          ))}
+            );
+          })}
 
           {tables.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -332,6 +402,7 @@ export function FloorPlanPage() {
             </div>
           )}
         </div>
+        </>
       )}
 
       {/* Edit table modal */}

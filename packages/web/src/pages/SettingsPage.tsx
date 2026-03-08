@@ -4,6 +4,16 @@ import { Input, Select, Button } from '@/components/ui';
 
 const DAYS_SL = ['Ponedeljek', 'Torek', 'Sreda', 'Četrtek', 'Petek', 'Sobota', 'Nedelja'];
 
+const DEFAULT_HOURS: OperatingHour[] = [
+  { dayOfWeek: 0, openTime: '12:00', closeTime: '23:00', lastReservation: '22:00', isClosed: false, slotDurationMin: 30 },
+  { dayOfWeek: 1, openTime: '12:00', closeTime: '23:00', lastReservation: '22:00', isClosed: false, slotDurationMin: 30 },
+  { dayOfWeek: 2, openTime: '12:00', closeTime: '23:00', lastReservation: '22:00', isClosed: false, slotDurationMin: 30 },
+  { dayOfWeek: 3, openTime: '12:00', closeTime: '23:00', lastReservation: '22:00', isClosed: false, slotDurationMin: 30 },
+  { dayOfWeek: 4, openTime: '12:00', closeTime: '23:00', lastReservation: '22:00', isClosed: false, slotDurationMin: 30 },
+  { dayOfWeek: 5, openTime: '12:00', closeTime: '23:59', lastReservation: '23:00', isClosed: false, slotDurationMin: 30 },
+  { dayOfWeek: 6, openTime: '12:00', closeTime: '23:00', lastReservation: '22:00', isClosed: true,  slotDurationMin: 30 },
+];
+
 interface OperatingHour {
   dayOfWeek: number; openTime: string; closeTime: string; lastReservation: string; isClosed: boolean; slotDurationMin: number;
 }
@@ -37,6 +47,16 @@ export function SettingsPage() {
   }, []);
 
   const flashSaved = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+
+  const createDefaultHours = async () => {
+    setHours(DEFAULT_HOURS);
+    setSaving(true);
+    try {
+      await apiFetch('/api/v1/config/hours', { method: 'PUT', body: JSON.stringify({ hours: DEFAULT_HOURS }) });
+      flashSaved();
+    } catch (err: any) { alert(err.message); }
+    finally { setSaving(false); }
+  };
 
   const updateHour = (dayOfWeek: number, field: string, value: unknown) => {
     setHours(prev => prev.map(h => h.dayOfWeek === dayOfWeek ? { ...h, [field]: value } : h));
@@ -141,7 +161,12 @@ export function SettingsPage() {
               <div className="space-y-5">
                 <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em] mb-1">Delovni čas</p>
                 {hours.length === 0 ? (
-                  <p className="text-[13px] text-gray-400 py-4">Ni podatkov o delovnem času. Kliknite Shrani za ustvarjanje privzetih vrednosti.</p>
+                  <div className="py-6 flex flex-col items-center gap-3">
+                    <p className="text-[13px] text-gray-400">Delovni čas še ni nastavljen.</p>
+                    <button onClick={createDefaultHours} disabled={saving} className="px-5 py-2 rounded-lg bg-[#1E293B] text-white text-[13px] font-medium hover:bg-[#334155] transition-colors disabled:opacity-50">
+                      {saving ? 'Ustvarjam...' : 'Vnesi vzorčne ure'}
+                    </button>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {hours.map(h => (

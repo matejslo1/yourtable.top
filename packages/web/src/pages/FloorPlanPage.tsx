@@ -22,6 +22,7 @@ interface Table {
     guestName: string;
     partySize: number;
     time: string;
+    durationMinutes?: number;
     status: string;
   } | null;
 }
@@ -41,6 +42,7 @@ interface Adjacency {
 
 interface LiveTableStatus {
   id: string;
+  label?: string;
   isOccupied: boolean;
   reservation: Table['reservation'];
 }
@@ -69,6 +71,8 @@ export function FloorPlanPage() {
   const [liveView, setLiveView] = useState(false);
   const [liveDate, setLiveDate] = useState(new Date().toISOString().slice(0, 10));
   const [liveTime, setLiveTime] = useState(new Date().toTimeString().slice(0, 5));
+  const [liveActionLoading, setLiveActionLoading] = useState<string | null>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const fetchFloorPlans = async () => {
@@ -116,7 +120,7 @@ export function FloorPlanPage() {
   useEffect(() => {
     if (!liveView) return;
     fetchLiveStatuses();
-    const id = window.setInterval(fetchLiveStatuses, 30000);
+    const id = window.setInterval(fetchLiveStatuses, 10000);
     return () => window.clearInterval(id);
   }, [liveView, fetchLiveStatuses]);
 
@@ -130,6 +134,41 @@ export function FloorPlanPage() {
 
   const currentPlan = floorPlans.find(p => p.id === activePlan);
   const tables = currentPlan?.tables || [];
+  const occupiedTables = tables.filter(t => t.isOccupied && t.reservation);
+  const occupiedCount = occupiedTables.length;
+  const freeCount = tables.length - occupiedCount;
+  const activeGuests = occupiedTables.reduce((sum, t) => sum + (t.reservation?.partySize || 0), 0);
+
+  const getTurnoverMinutes = (reservation: NonNullable<Table['reservation']>) => {
+    if (!reservation.durationMinutes) return null;
+    const [hours, minutes] = reservation.time.split(':').map(Number);
+    const end = new Date(`${liveDate}T00:00:00`);
+    end.setHours(hours, minutes + reservation.durationMinutes, 0, 0);
+    const diff = Math.round((end.getTime() - Date.now()) / 60000);
+    return diff;
+  };
+
+  const soonTurnovers = occupiedTables.filter(t => {
+    if (!t.reservation) return false;
+    const mins = getTurnoverMinutes(t.reservation);
+    return mins !== null && mins >= 0 && mins <= 15;
+  }).length;
+
+  const setReservationStatus = async (reservationId: string, status: 'SEATED' | 'COMPLETED' | 'NO_SHOW') => {
+    setLiveActionLoading(reservationId + status);
+    setLiveError(null);
+    try {
+      await apiFetch(`/api/v1/reservations/${reservationId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      });
+      await fetchLiveStatuses();
+    } catch (err: any) {
+      setLiveError(err.message || 'Napaka pri posodobitvi statusa rezervacije');
+    } finally {
+      setLiveActionLoading(null);
+    }
+  };
 
   // Create new floor plan
   const createFloorPlan = async () => {
@@ -315,7 +354,7 @@ export function FloorPlanPage() {
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div>
           <h1 className="font-display text-2xl font-bold text-gray-900">Tloris</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Povlecite mize za premikanje, kliknite za urejanje</p>
+          <p className="text-sm text-gray-500 mt-0.5">{liveView ? 'Host mode: live status miz + hitre akcije rezervacij' : 'Povlecite mize za premikanje, kliknite za urejanje'}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant={liveView ? 'primary' : 'secondary'} onClick={() => setLiveView(v => !v)}>
@@ -367,6 +406,23 @@ export function FloorPlanPage() {
         </div>
       )}
 
+      {liveView && (
+        <div className="mb-3 grid grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+            Zasedene mize: <strong>{occupiedCount}</strong>
+          </div>
+          <div className="px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">
+            Proste mize: <strong>{freeCount}</strong>
+          </div>
+          <div className="px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700">
+            Aktivni gosti: <strong>{activeGuests}</strong>
+          </div>
+          <div className="px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+            Turnover {'<'} 15 min: <strong>{soonTurnovers}</strong>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex-1 bg-gray-100 rounded-xl animate-pulse" />
       ) : floorPlans.length === 0 ? (
@@ -390,9 +446,10 @@ export function FloorPlanPage() {
             }
           </div>
         )}
+        <div className={`flex-1 min-h-[500px] ${liveView ? 'grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3' : ''}`}>
         <div
           ref={canvasRef}
-          className="flex-1 bg-[#f8f9fb] rounded-xl border-2 border-dashed border-gray-200 relative overflow-hidden min-h-[500px]"
+          className="bg-[#f8f9fb] rounded-xl border-2 border-dashed border-gray-200 relative overflow-hidden min-h-[500px]"
           style={{ backgroundImage: 'radial-gradient(circle, #ddd 1px, transparent 1px)', backgroundSize: '20px 20px' }}
         >
           {/* Adjacency lines */}
@@ -427,12 +484,13 @@ export function FloorPlanPage() {
             return (
             <div
               key={table.id}
-              style={{ ...getTableStyle(table), cursor: adjMode ? 'pointer' : (dragging?.id === table.id ? 'grabbing' : 'grab') }}
-              onMouseDown={e => { if (!adjMode) handleMouseDown(e, table); }}
+              style={{ ...getTableStyle(table), cursor: liveView ? 'default' : (adjMode ? 'pointer' : (dragging?.id === table.id ? 'grabbing' : 'grab')) }}
+              onMouseDown={e => { if (!adjMode && !liveView) handleMouseDown(e, table); }}
               onClick={e => {
                 if (dragging) return;
                 e.stopPropagation();
                 if (adjMode) { handleAdjClick(table); }
+                else if (liveView) { return; }
                 else { setSelectedTable(table); setEditForm({ label: table.label, minSeats: String(table.minSeats), maxSeats: String(table.maxSeats), shape: table.shape, isVip: table.isVip, isCombinable: table.isCombinable, joinGroup: table.joinGroup || '' }); setEditOpen(true); }
               }}
               className={`
@@ -472,6 +530,80 @@ export function FloorPlanPage() {
               </div>
             </div>
           )}
+        </div>
+
+        {liveView && (
+          <div className="bg-white rounded-xl border border-gray-200 p-3 overflow-auto min-h-[500px]">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">Live host panel</h3>
+            {liveError && (
+              <div className="mb-2 px-2.5 py-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                {liveError}
+              </div>
+            )}
+            {occupiedTables.length === 0 ? (
+              <p className="text-xs text-gray-500">Trenutno ni zasedenih miz za izbran termin.</p>
+            ) : (
+              <div className="space-y-2">
+                {occupiedTables.map((table) => {
+                  if (!table.reservation) return null;
+                  const reservation = table.reservation;
+                  const turnover = getTurnoverMinutes(reservation);
+                  const canSeat = reservation.status === 'CONFIRMED';
+                  const canComplete = reservation.status === 'SEATED';
+                  const canNoShow = reservation.status === 'CONFIRMED';
+                  return (
+                    <div key={`${table.id}-${reservation.reservationId}`} className="rounded-lg border border-gray-100 p-2.5 bg-gray-50/70">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-900">{table.label} · {reservation.guestName}</p>
+                          <p className="text-[11px] text-gray-500 mt-0.5">
+                            {reservation.partySize} gostov · {reservation.time} · {reservation.status}
+                          </p>
+                        </div>
+                        {turnover !== null && (
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                            turnover <= 15 ? 'text-amber-700 border-amber-300 bg-amber-50' : 'text-gray-600 border-gray-200 bg-white'
+                          }`}>
+                            {turnover < 0 ? 'Preteklo' : `${turnover} min`}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-1.5 mt-2">
+                        {canSeat && (
+                          <button
+                            onClick={() => setReservationStatus(reservation.reservationId, 'SEATED')}
+                            disabled={!!liveActionLoading}
+                            className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-[11px] font-semibold hover:bg-blue-100 disabled:opacity-50"
+                          >
+                            {liveActionLoading === reservation.reservationId + 'SEATED' ? 'Posodabljam...' : 'Seat'}
+                          </button>
+                        )}
+                        {canComplete && (
+                          <button
+                            onClick={() => setReservationStatus(reservation.reservationId, 'COMPLETED')}
+                            disabled={!!liveActionLoading}
+                            className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-100 disabled:opacity-50"
+                          >
+                            {liveActionLoading === reservation.reservationId + 'COMPLETED' ? 'Posodabljam...' : 'Complete'}
+                          </button>
+                        )}
+                        {canNoShow && (
+                          <button
+                            onClick={() => setReservationStatus(reservation.reservationId, 'NO_SHOW')}
+                            disabled={!!liveActionLoading}
+                            className="px-2.5 py-1 rounded-md bg-red-50 text-red-600 text-[11px] font-semibold hover:bg-red-100 disabled:opacity-50"
+                          >
+                            {liveActionLoading === reservation.reservationId + 'NO_SHOW' ? 'Posodabljam...' : 'No-show'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
         </div>
         </>
       )}

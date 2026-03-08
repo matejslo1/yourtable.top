@@ -99,6 +99,7 @@ export async function getTableStatuses(
     guestName: string;
     partySize: number;
     time: string;
+    durationMinutes: number;
     status: string;
     tags: unknown;
   }>();
@@ -118,6 +119,7 @@ export async function getTableStatuses(
           guestName: res.guest.name,
           partySize: res.partySize,
           time: res.time,
+          durationMinutes: res.durationMinutes,
           status: res.status,
           tags: res.guest.tags,
         });

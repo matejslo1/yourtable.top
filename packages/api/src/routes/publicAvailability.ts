@@ -8,6 +8,7 @@ const router = Router();
 const AvailabilityQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   partySize: z.coerce.number().int().min(1).max(50),
+  area: z.string().optional(),
 });
 
 // GET /:tenantSlug/availability — REAL availability with capacity checking
@@ -29,7 +30,7 @@ router.get('/:tenantSlug/availability', async (req: Request, res: Response, next
       return;
     }
 
-    const { date, partySize } = parsed.data;
+    const { date, partySize, area } = parsed.data;
     const requestedDate = new Date(`${date}T00:00:00`);
 
     // Check advance booking limits
@@ -49,6 +50,7 @@ router.get('/:tenantSlug/availability', async (req: Request, res: Response, next
       tenantId: tenant.id,
       date: requestedDate,
       partySize,
+      area,
     });
 
     if (availability.isClosed) {
@@ -76,6 +78,7 @@ router.get('/:tenantSlug/availability', async (req: Request, res: Response, next
     res.status(200).json({
       date,
       partySize,
+      area: area || null,
       isClosed: false,
       specialNote: availability.specialNote,
       available: availableSlots.length > 0,
@@ -104,6 +107,19 @@ router.get('/:tenantSlug/config', async (req: Request, res: Response, next: Next
     }
 
     const settings = tenant.settings as Record<string, unknown>;
+    const areas = await prisma.restaurantTable.findMany({
+      where: { floorPlan: { tenantId: tenant.id, isActive: true }, isActive: true, joinGroup: { not: null } },
+      select: { joinGroup: true },
+      distinct: ['joinGroup'],
+    });
+    const areaOptions = areas.map(a => a.joinGroup).filter(Boolean) as string[];
+    const servicePeriods = Array.isArray((settings as any)?.servicePeriods) ? (settings as any).servicePeriods : [];
+    const depositPolicy = ((settings as any)?.depositPolicy ?? {
+      enabled: false,
+      defaultType: 'fixed',
+      defaultAmount: 0,
+      rules: [],
+    });
 
     res.status(200).json({
       name: tenant.name,
@@ -118,6 +134,9 @@ router.get('/:tenantSlug/config', async (req: Request, res: Response, next: Next
       maxAdvanceDays: tenant.seatingConfig?.maxAdvanceDays ?? 60,
       holdTtlSeconds: tenant.seatingConfig?.holdTtlSeconds ?? 420,
       waitlistEnabled: tenant.seatingConfig?.waitlistEnabled ?? false,
+      areas: areaOptions,
+      servicePeriods,
+      depositPolicy,
     });
   } catch (err) {
     next(err);

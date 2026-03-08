@@ -6,8 +6,14 @@ import { GuestForm } from './GuestForm';
 import { SuccessScreen } from './SuccessScreen';
 import { WaitlistPrompt } from './WaitlistPrompt';
 import {
-  fetchAvailability, createHold, completeHold, abandonHold, joinWaitlist, fetchConfig,
-  type DayAvailability, type HoldResponse,
+  fetchAvailability,
+  createHold,
+  completeHold,
+  abandonHold,
+  joinWaitlist,
+  fetchConfig,
+  type DayAvailability,
+  type HoldResponse,
 } from '../lib/api';
 
 type Step = 'select' | 'no-tables' | 'form' | 'success' | 'waitlist-success';
@@ -35,13 +41,26 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
   const [canWaitlist, setCanWaitlist] = useState(false);
   const [waitlistEnabledConfig, setWaitlistEnabledConfig] = useState(false);
 
+  const [areas, setAreas] = useState<string[]>([]);
+  const [servicePeriods, setServicePeriods] = useState<string[]>([]);
+  const [selectedArea, setSelectedArea] = useState('');
+  const [selectedServicePeriod, setSelectedServicePeriod] = useState('');
+  const [specialOccasion, setSpecialOccasion] = useState('');
+
+  const [depositInfo, setDepositInfo] = useState<{ amount: number; type: string } | null>(null);
+  const [depositAccepted, setDepositAccepted] = useState(false);
+  const [pendingTimeForDeposit, setPendingTimeForDeposit] = useState<string | null>(null);
+
   useEffect(() => {
     fetchConfig(tenantSlug)
-      .then(cfg => setWaitlistEnabledConfig(!!cfg.waitlistEnabled))
+      .then(cfg => {
+        setWaitlistEnabledConfig(!!cfg.waitlistEnabled);
+        setAreas(cfg.areas || []);
+        setServicePeriods(cfg.servicePeriods || []);
+      })
       .catch(() => setWaitlistEnabledConfig(false));
   }, [tenantSlug]);
 
-  // Fetch availability when date or party size changes
   useEffect(() => {
     if (!selectedDate) return;
     const load = async () => {
@@ -49,7 +68,7 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
       setError(null);
       setSelectedTime(null);
       try {
-        const data = await fetchAvailability(tenantSlug, selectedDate, partySize);
+        const data = await fetchAvailability(tenantSlug, selectedDate, partySize, selectedArea || undefined);
         setAvailability(data);
       } catch (err: any) {
         setError(err.message || 'Napaka pri nalaganju terminov');
@@ -58,9 +77,8 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
       }
     };
     load();
-  }, [selectedDate, partySize, tenantSlug]);
+  }, [selectedDate, partySize, tenantSlug, selectedArea]);
 
-  // Abandon hold on unmount / page close
   useEffect(() => {
     if (!hold) return;
     const cleanup = () => abandonHold(tenantSlug, hold.reservationId, hold.sessionToken);
@@ -71,68 +89,98 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
     };
   }, [hold, tenantSlug, step]);
 
-  // Handle time selection → create HOLD
   const handleTimeSelect = useCallback(async (time: string) => {
     if (!selectedDate) return;
     setSelectedTime(time);
     setLoadingHold(true);
     setError(null);
+    setDepositInfo(null);
+    setPendingTimeForDeposit(null);
 
     try {
-      const holdData = await createHold(tenantSlug, { date: selectedDate, time, partySize });
+      const holdData = await createHold(tenantSlug, {
+        date: selectedDate,
+        time,
+        partySize,
+        area: selectedArea || undefined,
+        servicePeriod: selectedServicePeriod || undefined,
+        specialOccasion: specialOccasion || undefined,
+        depositAccepted: depositAccepted || undefined,
+      });
       setHold(holdData);
       setStep('form');
     } catch (err: any) {
+      if (err.code === 'DepositRequired') {
+        setDepositInfo(err.deposit || null);
+        setPendingTimeForDeposit(time);
+        setSelectedTime(null);
+        return;
+      }
+
       const noTables = err.code === 'NO_TABLES' || /no tables available|ni prostih miz/i.test(err.message || '');
       if (noTables) {
-        // No tables available — show waitlist prompt
         setCanWaitlist(err.canWaitlist ?? waitlistEnabledConfig);
         setAlternatives(err.alternatives || availability?.alternatives || []);
         setStep('no-tables');
-        // NOTE: Do NOT null selectedTime here — WaitlistPrompt needs it
       } else {
-        setError(err.message || 'Termin ni več na voljo');
+        setError(err.message || 'Termin ni vec na voljo');
         setSelectedTime(null);
       }
     } finally {
       setLoadingHold(false);
     }
-  }, [selectedDate, partySize, tenantSlug, availability, waitlistEnabledConfig]);
+  }, [
+    availability,
+    depositAccepted,
+    partySize,
+    selectedArea,
+    selectedDate,
+    selectedServicePeriod,
+    specialOccasion,
+    tenantSlug,
+    waitlistEnabledConfig,
+  ]);
 
-  // Handle alternative time selection
   const handleAlternative = useCallback(async (time: string) => {
     setStep('select');
     setSelectedTime(null);
     handleTimeSelect(time);
   }, [handleTimeSelect]);
 
-  // Handle waitlist join
   const handleJoinWaitlist = useCallback(async (data: { guestName: string; guestEmail: string; guestPhone?: string }) => {
     if (!selectedDate || !selectedTime) return;
     setLoadingWaitlist(true);
     try {
       await joinWaitlist(tenantSlug, {
-        date: selectedDate, time: selectedTime, partySize,
+        date: selectedDate,
+        time: selectedTime,
+        partySize,
         ...data,
       });
       setGuestName(data.guestName);
       setStep('waitlist-success');
     } catch (err: any) {
-      setError(err.message || 'Napaka pri prijavi na čakalno vrsto');
+      setError(err.message || 'Napaka pri prijavi na cakalno vrsto');
     } finally {
       setLoadingWaitlist(false);
     }
   }, [selectedDate, selectedTime, partySize, tenantSlug]);
 
-  // Handle form submission → complete HOLD
   const handleFormSubmit = useCallback(async (data: {
-    guestName: string; guestEmail: string; guestPhone?: string; notes?: string;
+    guestName: string;
+    guestEmail: string;
+    guestPhone?: string;
+    notes?: string;
   }) => {
     if (!hold) return;
     setLoadingComplete(true);
     setError(null);
     try {
-      await completeHold(tenantSlug, hold.reservationId, { ...data, sessionToken: hold.sessionToken });
+      await completeHold(tenantSlug, hold.reservationId, {
+        ...data,
+        sessionToken: hold.sessionToken,
+        specialOccasion: specialOccasion || undefined,
+      });
       setGuestName(data.guestName);
       setStep('success');
     } catch (err: any) {
@@ -140,7 +188,7 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
     } finally {
       setLoadingComplete(false);
     }
-  }, [hold, tenantSlug]);
+  }, [hold, specialOccasion, tenantSlug]);
 
   const handleCancel = useCallback(() => {
     if (hold) abandonHold(tenantSlug, hold.reservationId, hold.sessionToken);
@@ -150,45 +198,89 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
   }, [hold, tenantSlug]);
 
   const handleReset = () => {
-    setStep('select'); setPartySize(2); setSelectedDate(null); setSelectedTime(null);
-    setAvailability(null); setHold(null); setError(null); setGuestName(''); setAlternatives([]);
+    setStep('select');
+    setPartySize(2);
+    setSelectedDate(null);
+    setSelectedTime(null);
+    setAvailability(null);
+    setHold(null);
+    setError(null);
+    setGuestName('');
+    setAlternatives([]);
+    setSelectedArea('');
+    setSelectedServicePeriod('');
+    setSpecialOccasion('');
+    setDepositInfo(null);
+    setDepositAccepted(false);
+    setPendingTimeForDeposit(null);
   };
 
   return (
     <div className="yourtable-widget yt-max-w-md yt-mx-auto yt-font-body">
       <div className="yt-rounded-2xl yt-border yt-border-gray-100 yt-shadow-lg yt-shadow-gray-900/5 yt-overflow-hidden yt-bg-white">
-
-        {/* Header — Pro light theme */}
         <div className="yt-px-6 yt-py-4 yt-border-b yt-border-gray-100">
-          <h2 className="yt-font-display yt-text-lg yt-font-bold yt-text-gray-900">
-            Rezerviraj mizo
-          </h2>
+          <h2 className="yt-font-display yt-text-lg yt-font-bold yt-text-gray-900">Rezerviraj mizo</h2>
           <p className="yt-text-sm yt-text-gray-400 yt-mt-0.5">
-            {step === 'select' && 'Izberi datum, čas in število gostov'}
+            {step === 'select' && 'Izberi datum, cas in stevilo gostov'}
             {step === 'no-tables' && 'Ni prostih miz za ta termin'}
-            {step === 'form' && 'Vnesite vaše podatke'}
+            {step === 'form' && 'Vnesite vase podatke'}
             {step === 'success' && 'Rezervacija potrjena'}
-            {step === 'waitlist-success' && 'Prijavljeni na čakalno vrsto'}
+            {step === 'waitlist-success' && 'Prijavljeni na cakalno vrsto'}
           </p>
         </div>
 
-        {/* Content */}
         <div className="yt-p-6 yt-bg-[#F8F9FA]">
-          {/* Error banner */}
           {error && (
             <div className="yt-mb-4 yt-px-4 yt-py-3 yt-rounded-xl yt-bg-red-50 yt-border yt-border-red-200 yt-animate-fade-in">
               <p className="yt-text-sm yt-text-red-700">{error}</p>
             </div>
           )}
 
-          {/* Step 1: Selection */}
           {step === 'select' && (
             <div className="yt-space-y-5 yt-animate-fade-in">
               <div>
-                <label className="yt-block yt-text-sm yt-font-semibold yt-text-gray-700 yt-mb-3">Število gostov</label>
+                <label className="yt-block yt-text-sm yt-font-semibold yt-text-gray-700 yt-mb-3">Stevilo gostov</label>
                 <div className="yt-flex yt-justify-center">
                   <PartySizeSelector value={partySize} onChange={setPartySize} />
                 </div>
+              </div>
+
+              {areas.length > 0 && (
+                <div>
+                  <label className="yt-block yt-text-sm yt-font-semibold yt-text-gray-700 yt-mb-2">Obmocje</label>
+                  <select
+                    value={selectedArea}
+                    onChange={e => setSelectedArea(e.target.value)}
+                    className="yt-w-full yt-px-3.5 yt-py-2.5 yt-rounded-xl yt-border yt-border-gray-200 yt-bg-white yt-text-sm"
+                  >
+                    <option value="">Vsa obmocja</option>
+                    {areas.map(area => <option key={area} value={area}>{area}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {servicePeriods.length > 0 && (
+                <div>
+                  <label className="yt-block yt-text-sm yt-font-semibold yt-text-gray-700 yt-mb-2">Service period</label>
+                  <select
+                    value={selectedServicePeriod}
+                    onChange={e => setSelectedServicePeriod(e.target.value)}
+                    className="yt-w-full yt-px-3.5 yt-py-2.5 yt-rounded-xl yt-border yt-border-gray-200 yt-bg-white yt-text-sm"
+                  >
+                    <option value="">Poljuben</option>
+                    {servicePeriods.map(period => <option key={period} value={period}>{period}</option>)}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="yt-block yt-text-sm yt-font-semibold yt-text-gray-700 yt-mb-2">Posebna priloznost</label>
+                <input
+                  value={specialOccasion}
+                  onChange={e => setSpecialOccasion(e.target.value)}
+                  placeholder="Npr. rojstni dan"
+                  className="yt-w-full yt-px-3.5 yt-py-2.5 yt-rounded-xl yt-border yt-border-gray-200 yt-bg-white yt-text-sm"
+                />
               </div>
 
               <div>
@@ -200,7 +292,7 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
 
               {selectedDate && (
                 <div className="yt-animate-slide-up">
-                  <label className="yt-block yt-text-sm yt-font-semibold yt-text-gray-700 yt-mb-3">Razpoložljivi termini</label>
+                  <label className="yt-block yt-text-sm yt-font-semibold yt-text-gray-700 yt-mb-3">Razpolozljivi termini</label>
                   {availability?.isClosed ? (
                     <div className="yt-text-center yt-py-6 yt-bg-white yt-rounded-xl yt-border yt-border-gray-100">
                       <p className="yt-text-sm yt-font-medium yt-text-gray-500">Zaprto</p>
@@ -209,6 +301,31 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
                   ) : (
                     <TimeSlotPicker slots={availability?.slots || []} selectedTime={selectedTime} onSelect={handleTimeSelect} loading={loadingSlots} />
                   )}
+                </div>
+              )}
+
+              {depositInfo && pendingTimeForDeposit && (
+                <div className="yt-rounded-xl yt-border yt-border-amber-200 yt-bg-amber-50 yt-p-4 yt-space-y-2">
+                  <p className="yt-text-sm yt-font-semibold yt-text-amber-800">Za termin {pendingTimeForDeposit} je potreben depozit.</p>
+                  <p className="yt-text-xs yt-text-amber-700">
+                    Znesek: {depositInfo.amount} {depositInfo.type === 'percent' ? '%' : 'EUR'}
+                  </p>
+                  <label className="yt-flex yt-items-center yt-gap-2 yt-text-xs yt-text-amber-800">
+                    <input
+                      type="checkbox"
+                      checked={depositAccepted}
+                      onChange={e => setDepositAccepted(e.target.checked)}
+                    />
+                    Potrjujem depozit
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!depositAccepted || loadingHold}
+                    onClick={() => handleTimeSelect(pendingTimeForDeposit)}
+                    className="yt-w-full yt-py-2 yt-rounded-lg yt-bg-amber-600 yt-text-white yt-text-sm yt-font-semibold disabled:yt-opacity-50"
+                  >
+                    Nadaljuj z depozitom
+                  </button>
                 </div>
               )}
 
@@ -221,7 +338,6 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
             </div>
           )}
 
-          {/* No tables — waitlist prompt */}
           {step === 'no-tables' && selectedDate && selectedTime && (
             <WaitlistPrompt
               date={selectedDate}
@@ -236,26 +352,23 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
             />
           )}
 
-          {/* Step 2: Guest form */}
           {step === 'form' && hold && (
             <div className="yt-animate-slide-up">
               <div className="yt-flex yt-items-center yt-gap-2 yt-text-sm yt-text-gray-500 yt-mb-5 yt-pb-4 yt-border-b yt-border-gray-100">
                 <span className="yt-font-medium yt-text-gray-900">{selectedDate}</span>
-                <span>·</span>
+                <span>&middot;</span>
                 <span className="yt-font-medium yt-text-gray-900">{selectedTime}</span>
-                <span>·</span>
-                <span>{partySize} {partySize === 1 ? 'gost' : partySize <= 4 ? 'gostje' : 'gostov'}</span>
+                <span>&middot;</span>
+                <span>{partySize} gostov</span>
               </div>
               <GuestForm holdExpiresAt={hold.holdExpiresAt} onSubmit={handleFormSubmit} onCancel={handleCancel} loading={loadingComplete} />
             </div>
           )}
 
-          {/* Success */}
           {step === 'success' && selectedDate && selectedTime && (
             <SuccessScreen date={selectedDate} time={selectedTime} partySize={partySize} guestName={guestName} onNewReservation={handleReset} />
           )}
 
-          {/* Waitlist success */}
           {step === 'waitlist-success' && (
             <div className="yt-text-center yt-py-6 yt-animate-fade-in">
               <div className="yt-w-16 yt-h-16 yt-mx-auto yt-mb-4 yt-rounded-full yt-bg-emerald-50 yt-flex yt-items-center yt-justify-center">
@@ -263,7 +376,7 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
                   <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
-              <h3 className="yt-font-display yt-text-xl yt-font-bold yt-text-gray-900 yt-mb-1">Na čakalni vrsti!</h3>
+              <h3 className="yt-font-display yt-text-xl yt-font-bold yt-text-gray-900 yt-mb-1">Na cakalni vrsti!</h3>
               <p className="yt-text-sm yt-text-gray-500 yt-mb-6">Obvestili vas bomo ko se sprosti mesto za {selectedTime}</p>
               <button onClick={handleReset} className="yt-text-sm yt-text-emerald-600 yt-font-medium hover:yt-text-emerald-700 yt-transition-colors">
                 Nova rezervacija
@@ -272,7 +385,6 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
           )}
         </div>
 
-        {/* Footer */}
         <div className="yt-px-6 yt-py-3 yt-border-t yt-border-gray-100 yt-bg-white">
           <p className="yt-text-[10px] yt-text-gray-400 yt-text-center">
             Powered by <span className="yt-font-semibold yt-text-gray-500">YourTable</span>
@@ -282,4 +394,3 @@ export function BookingWidget({ tenantSlug, theme = 'light' }: BookingWidgetProp
     </div>
   );
 }
-

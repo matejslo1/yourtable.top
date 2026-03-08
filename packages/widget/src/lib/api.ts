@@ -22,12 +22,21 @@ async function api<T>(tenantSlug: string, path: string, options: ApiOptions = {}
       err.code = 'NO_TABLES';
       err.canWaitlist = json.canWaitlist;
       err.alternatives = json.alternatives || [];
+      err.deposit = json.deposit || null;
+      throw err;
+    }
+    if (res.status === 402) {
+      const err = new Error(json.message || 'Depozit je obvezen') as any;
+      err.code = json.error || 'DepositRequired';
+      err.deposit = json.deposit || null;
       throw err;
     }
     const details = json.details
       ? Object.entries(json.details).map(([f, msgs]) => `${f}: ${(msgs as string[]).join(', ')}`).join('; ')
       : null;
-    throw new Error(details || json.message || `API error: ${res.status}`);
+    const err = new Error(details || json.message || `API error: ${res.status}`) as any;
+    err.code = json.error || `HTTP_${res.status}`;
+    throw err;
   }
 
   return json.data ?? json;
@@ -44,6 +53,14 @@ export interface WidgetConfig {
   holdTtlSeconds: number;
   bookingWidgetEnabled: boolean;
   waitlistEnabled?: boolean;
+  areas?: string[];
+  servicePeriods?: string[];
+  depositPolicy?: {
+    enabled: boolean;
+    defaultType?: string;
+    defaultAmount?: number;
+    rules?: Array<Record<string, unknown>>;
+  };
 }
 
 export function fetchConfig(slug: string): Promise<WidgetConfig> {
@@ -69,9 +86,10 @@ export interface DayAvailability {
   alternatives?: string[];
 }
 
-export function fetchAvailability(slug: string, date: string, partySize?: number): Promise<DayAvailability> {
+export function fetchAvailability(slug: string, date: string, partySize?: number, area?: string): Promise<DayAvailability> {
   const params = new URLSearchParams({ date });
   if (partySize) params.set('partySize', String(partySize));
+  if (area) params.set('area', area);
   return api(slug, `/availability?${params}`);
 }
 
@@ -82,6 +100,7 @@ export interface HoldResponse {
   holdExpiresAt: string;
   sessionToken: string;
   assignedTables: { id: string; label: string }[];
+  deposit?: { amount: number; type: string } | null;
 }
 
 export function createHold(slug: string, data: {
@@ -89,6 +108,10 @@ export function createHold(slug: string, data: {
   time: string;
   partySize: number;
   durationMinutes?: number;
+  area?: string;
+  servicePeriod?: string;
+  specialOccasion?: string;
+  depositAccepted?: boolean;
 }): Promise<HoldResponse> {
   return api(slug, '/hold', { method: 'POST', body: data });
 }
@@ -105,6 +128,7 @@ export function completeHold(slug: string, holdId: string, data: {
   guestPhone?: string;
   notes?: string;
   sessionToken: string;
+  specialOccasion?: string;
 }): Promise<CompleteResponse> {
   return api(slug, `/hold/${holdId}/complete`, { method: 'POST', body: data });
 }

@@ -133,4 +133,46 @@ router.delete('/special-days/:id', requireRole('owner', 'admin', 'manager'), asy
   } catch (err) { next(err); }
 });
 
+// Service periods are stored in tenant.settings.servicePeriods
+router.get('/service-periods', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const tenant = await prisma.tenant.findUnique({ where: { id: req.user!.tenantId }, select: { settings: true } });
+    const settings = (tenant?.settings || {}) as any;
+    res.status(200).json({ data: Array.isArray(settings.servicePeriods) ? settings.servicePeriods : [] });
+  } catch (err) { next(err); }
+});
+
+router.put('/service-periods', requireRole('owner', 'admin', 'manager'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { periods } = req.body as { periods?: any[] };
+    const tenant = await prisma.tenant.findUnique({ where: { id: req.user!.tenantId }, select: { settings: true } });
+    const settings = (tenant?.settings || {}) as any;
+    const nextSettings = { ...settings, servicePeriods: Array.isArray(periods) ? periods : [] };
+    await prisma.tenant.update({
+      where: { id: req.user!.tenantId },
+      data: { settings: nextSettings as any },
+    });
+    res.status(200).json({ data: nextSettings.servicePeriods });
+  } catch (err) { next(err); }
+});
+
+// Integrations hub settings placeholder (resend/twilio/stripe toggles)
+router.get('/integrations', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const tenant = await prisma.tenant.findUnique({ where: { id: req.user!.tenantId }, select: { settings: true } });
+    const settings = (tenant?.settings || {}) as any;
+    res.status(200).json({ data: settings.integrations ?? {} });
+  } catch (err) { next(err); }
+});
+
+router.put('/integrations', requireRole('owner', 'admin', 'manager'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const tenant = await prisma.tenant.findUnique({ where: { id: req.user!.tenantId }, select: { settings: true } });
+    const settings = (tenant?.settings || {}) as any;
+    const nextSettings = { ...settings, integrations: req.body ?? {} };
+    await prisma.tenant.update({ where: { id: req.user!.tenantId }, data: { settings: nextSettings as any } });
+    res.status(200).json({ data: nextSettings.integrations });
+  } catch (err) { next(err); }
+});
+
 export default router;

@@ -149,12 +149,12 @@ const NAV: NavGroup[] = [
         ],
       },
       {
-        to: '/reports', label: 'Poročila', icon: <IcChart />, soon: true,
+        to: '/reports', label: 'Poročila', icon: <IcChart />,
         sub: [
-          { label: 'Zasedenost', soon: true },
-          { label: 'Prihodki', soon: true },
-          { label: 'Analitika gostov', soon: true },
-          { label: 'Peak hours', soon: true },
+          { label: 'Zasedenost', to: '/reports' },
+          { label: 'Prihodki', to: '/reports' },
+          { label: 'Analitika gostov', to: '/reports' },
+          { label: 'Peak hours', to: '/reports' },
         ],
       },
     ],
@@ -255,7 +255,7 @@ export function AdminLayout() {
         )}
 
         {/* Navigation */}
-        <nav className="flex-1 py-2 overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: 'none' }}>
+        <nav className="flex-1 py-2 overflow-y-auto overflow-x-visible" style={{ scrollbarWidth: 'none' }}>
           {NAV.map((group, gi) => (
             <div key={group.label} className={gi > 0 ? 'mt-3.5' : ''}>
               {/* Group label */}

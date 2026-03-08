@@ -7,6 +7,13 @@ import { UserRole } from '@prisma/client';
 const router = Router();
 router.use(requireAuth);
 
+const DEFAULT_PERMISSION_TEMPLATES: Record<string, Record<string, boolean>> = {
+  owner: { reservations: true, floorPlan: true, guests: true, waitlist: true, payments: true, users: true, settings: true, analytics: true },
+  admin: { reservations: true, floorPlan: true, guests: true, waitlist: true, payments: true, users: true, settings: true, analytics: true },
+  manager: { reservations: true, floorPlan: true, guests: true, waitlist: true, payments: true, users: false, settings: false, analytics: true },
+  staff: { reservations: true, floorPlan: true, guests: true, waitlist: true, payments: false, users: false, settings: false, analytics: false },
+};
+
 // GET /api/v1/users
 router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -31,8 +38,8 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
 // POST /api/v1/users — Create new user in this tenant
 router.post('/', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { email, password, name, role = 'staff' } = req.body as {
-      email?: string; password?: string; name?: string; role?: string;
+    const { email, password, name, role = 'staff', permissions } = req.body as {
+      email?: string; password?: string; name?: string; role?: string; permissions?: Record<string, boolean>;
     };
 
     if (!email || !password || !name) {
@@ -61,6 +68,7 @@ router.post('/', requireRole('owner', 'admin'), async (req: AuthRequest, res: Re
         email,
         name,
         role: role as UserRole,
+        permissions: permissions ?? DEFAULT_PERMISSION_TEMPLATES[role] ?? DEFAULT_PERMISSION_TEMPLATES.staff,
       },
     });
 
@@ -73,14 +81,18 @@ router.post('/', requireRole('owner', 'admin'), async (req: AuthRequest, res: Re
 // PATCH /api/v1/users/:id — Update name/role
 router.patch('/:id', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { name, role } = req.body as { name?: string; role?: string };
+    const { name, role, permissions } = req.body as { name?: string; role?: string; permissions?: Record<string, boolean> };
 
     const existing = await prisma.user.findFirst({ where: { id: req.params.id, tenantId: req.user!.tenantId } });
     if (!existing) { res.status(404).json({ error: 'NotFound', message: 'User not found', statusCode: 404 }); return; }
 
     const user = await prisma.user.update({
       where: { id: req.params.id },
-      data: { ...(name && { name }), ...(role && { role: role as UserRole }) },
+      data: {
+        ...(name && { name }),
+        ...(role && { role: role as UserRole }),
+        ...(permissions && { permissions: permissions as any }),
+      },
     });
 
     res.status(200).json(user);
@@ -160,6 +172,32 @@ router.delete('/:id', requireRole('owner'), async (req: AuthRequest, res: Respon
     await prisma.user.delete({ where: { id: req.params.id } });
 
     res.status(200).json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/v1/users/meta/permissions/templates
+router.get('/meta/permissions/templates', requireRole('owner', 'admin'), async (_req: AuthRequest, res: Response) => {
+  res.status(200).json({ data: DEFAULT_PERMISSION_TEMPLATES });
+});
+
+// PUT /api/v1/users/:id/permissions
+router.put('/:id/permissions', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { permissions } = req.body as { permissions?: Record<string, boolean> };
+    if (!permissions || typeof permissions !== 'object') {
+      res.status(400).json({ error: 'BadRequest', message: 'permissions object required', statusCode: 400 });
+      return;
+    }
+    const existing = await prisma.user.findFirst({ where: { id: req.params.id, tenantId: req.user!.tenantId } });
+    if (!existing) { res.status(404).json({ error: 'NotFound', message: 'User not found', statusCode: 404 }); return; }
+
+    const user = await prisma.user.update({
+      where: { id: req.params.id },
+      data: { permissions: permissions as any },
+    });
+    res.status(200).json({ data: user });
   } catch (err) {
     next(err);
   }

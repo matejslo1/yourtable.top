@@ -6,6 +6,7 @@ interface AvailabilityParams {
   tenantId: string;
   date: Date;
   partySize?: number;
+  area?: string;
 }
 
 interface SlotAvailability {
@@ -21,7 +22,7 @@ interface SlotAvailability {
  * Returns time slots with occupancy information
  */
 export async function getAvailability(params: AvailabilityParams) {
-  const { tenantId, date, partySize } = params;
+  const { tenantId, date, partySize, area } = params;
 
   // Get day of week (0=Mon in our system)
   const jsDay = date.getDay(); // 0=Sun
@@ -81,6 +82,7 @@ export async function getAvailability(params: AvailabilityParams) {
 
   for (const fp of floorPlans) {
     for (const table of fp.tables) {
+      if (area && table.joinGroup !== area) continue;
       allTables.push({
         id: table.id,
         label: table.label,

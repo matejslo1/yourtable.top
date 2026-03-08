@@ -20,6 +20,8 @@ import waitlistRoutes from './routes/waitlist.js';
 import paymentRoutes from './routes/payments.js';
 import voucherRoutes from './routes/vouchers.js';
 import setupRoutes from './routes/setup.js';
+import analyticsRoutes from './routes/analytics.js';
+import aiRoutes from './routes/ai.js';
 
 const app = express();
 
@@ -78,6 +80,8 @@ app.use('/api/v1/guests', guestRoutes);
 app.use('/api/v1/waitlist', waitlistRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/vouchers', voucherRoutes);
+app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api/v1/ai', aiRoutes);
 
 // API Routes (v1) - Public (Booking Widget)
 app.use('/api/v1/public', publicBookingRoutes);

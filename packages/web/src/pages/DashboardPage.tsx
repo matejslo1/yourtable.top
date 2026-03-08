@@ -29,6 +29,11 @@ interface TimelineSlot {
   }>;
 }
 
+interface ShiftSummary {
+  summary: string;
+  recommendations: string[];
+}
+
 // ============================================
 // DASHBOARD PAGE
 // ============================================
@@ -36,6 +41,7 @@ interface TimelineSlot {
 export function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [timeline, setTimeline] = useState<TimelineSlot[]>([]);
+  const [shiftSummary, setShiftSummary] = useState<ShiftSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -44,10 +50,12 @@ export function DashboardPage() {
     Promise.all([
       apiFetch<{ data: Stats }>('/api/v1/reservations/stats'),
       apiFetch<{ data: { slots: TimelineSlot[]; stats: any } }>(`/api/v1/reservations/timeline?date=${today}`),
+      apiFetch<{ data: ShiftSummary }>(`/api/v1/ai/shift-summary?date=${today}`).catch(() => ({ data: null as any })),
     ])
-      .then(([sRes, tRes]) => {
+      .then(([sRes, tRes, aiRes]) => {
         setStats(sRes.data);
         setTimeline(tRes.data.slots || []);
+        if (aiRes?.data) setShiftSummary(aiRes.data);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -270,6 +278,18 @@ export function DashboardPage() {
                 )}
               </div>
             </div>
+
+            {shiftSummary && (
+              <div className="mt-5 bg-white rounded-2xl border border-gray-100 p-6" style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
+                <h3 className="text-[13px] font-semibold text-[#1E293B] mb-2">AI Shift Summary</h3>
+                <p className="text-[12px] text-gray-600 mb-3">{shiftSummary.summary}</p>
+                <ul className="space-y-1">
+                  {shiftSummary.recommendations.slice(0, 3).map((item, idx) => (
+                    <li key={idx} className="text-[12px] text-gray-500">{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </>
         )}
       </div>

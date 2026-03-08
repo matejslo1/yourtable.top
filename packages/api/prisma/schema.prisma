@@ -524,3 +524,4 @@ enum VoucherTransactionType {
   redemption
   refund
 }
+

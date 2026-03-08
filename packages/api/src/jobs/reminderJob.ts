@@ -1,6 +1,6 @@
 import { sendReminderEmails } from '../services/notificationService.js';
 
-const REMINDER_INTERVAL_MS = 60 * 60 * 1000; // Check every hour
+const REMINDER_INTERVAL_MS = 15 * 60 * 1000; // Check every 15min
 
 let intervalId: NodeJS.Timeout | null = null;
 
@@ -9,7 +9,7 @@ let intervalId: NodeJS.Timeout | null = null;
  * Checks hourly, sends reminders for tomorrow's reservations
  */
 export function startReminderJob() {
-  console.log('[Cron] Reminder job started (every 60min)');
+  console.log('[Cron] Reminder job started (every 15min)');
 
   // Run once on startup
   runReminders();

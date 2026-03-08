@@ -11,6 +11,7 @@ interface SendSmsParams {
   tenantId?: string;
   reservationId?: string;
   type?: string;
+  templateData?: unknown;
 }
 
 /**
@@ -47,15 +48,29 @@ export async function sendSms(params: SendSmsParams): Promise<boolean> {
 
     if (!res.ok) {
       console.error('[SMS] Twilio error:', data);
-      if (params.tenantId && params.reservationId) {
-        await logNotification(params.tenantId, params.reservationId, params.type || 'confirmation', params.to, 'failed');
+      if (params.tenantId) {
+        await logNotification(
+          params.tenantId,
+          params.reservationId,
+          params.type || 'confirmation',
+          params.to,
+          'failed',
+          params.templateData
+        );
       }
       return false;
     }
 
     console.log(`[SMS] Sent to ${to}: "${params.body.slice(0, 60)}..." SID: ${data.sid}`);
-    if (params.tenantId && params.reservationId) {
-      await logNotification(params.tenantId, params.reservationId, params.type || 'confirmation', params.to, 'sent');
+    if (params.tenantId) {
+      await logNotification(
+        params.tenantId,
+        params.reservationId,
+        params.type || 'confirmation',
+        params.to,
+        'sent',
+        params.templateData
+      );
     }
     return true;
   } catch (error) {
@@ -91,21 +106,23 @@ function normalizePhone(phone: string): string | null {
 
 async function logNotification(
   tenantId: string,
-  reservationId: string,
+  reservationId: string | undefined,
   type: string,
   recipient: string,
-  status: 'sent' | 'failed'
+  status: 'sent' | 'failed',
+  templateData?: unknown
 ) {
   try {
     await prisma.notification.create({
       data: {
         tenantId,
-        reservationId,
+        reservationId: reservationId || null,
         type: type as any,
         channel: 'sms',
         recipient,
         status: status as any,
         sentAt: status === 'sent' ? new Date() : null,
+        templateData: templateData as any,
       },
     });
   } catch (err) {
@@ -221,5 +238,57 @@ export async function sendReminderSms(reservationId: string) {
     tenantId: reservation.tenantId,
     reservationId: reservation.id,
     type: 'reminder',
+  });
+}
+
+export function reviewRequestSmsBody(data: {
+  tenantName: string;
+  reviewUrl?: string;
+}): string {
+  return data.reviewUrl
+    ? `${data.tenantName}: Hvala za obisk. Veseli bomo vase ocene: ${data.reviewUrl}`
+    : `${data.tenantName}: Hvala za obisk. Veseli bomo vase ocene.`;
+}
+
+export async function sendWaitlistOfferSms(data: {
+  tenantId: string;
+  phone: string;
+  date: string;
+  time: string;
+  tenantName: string;
+  entryId: string;
+}) {
+  const body = waitlistOfferSmsBody({
+    date: data.date,
+    time: data.time,
+    tenantName: data.tenantName,
+  });
+  return sendSms({
+    to: data.phone,
+    body,
+    tenantId: data.tenantId,
+    type: 'waitlist_offer',
+    templateData: { entryId: data.entryId },
+  });
+}
+
+export async function sendReviewRequestSms(data: {
+  tenantId: string;
+  reservationId: string;
+  phone: string;
+  tenantName: string;
+  reviewUrl?: string;
+}) {
+  const body = reviewRequestSmsBody({
+    tenantName: data.tenantName,
+    reviewUrl: data.reviewUrl,
+  });
+  return sendSms({
+    to: data.phone,
+    body,
+    tenantId: data.tenantId,
+    reservationId: data.reservationId,
+    type: 'review_request',
+    templateData: { channel: 'sms' },
   });
 }

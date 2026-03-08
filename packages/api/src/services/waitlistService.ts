@@ -83,7 +83,7 @@ export async function getWaitlist(tenantId: string, date?: Date) {
  * Offer a spot to a waitlisted guest
  * Sets expiry timer for them to accept
  */
-export async function offerSpot(entryId: string, tenantId: string, userId: string) {
+export async function offerSpot(entryId: string, tenantId: string, userId?: string) {
   const entry = await prisma.waitlistEntry.findFirst({
     where: { id: entryId, tenantId, status: 'waiting' },
   });
@@ -106,14 +106,16 @@ export async function offerSpot(entryId: string, tenantId: string, userId: strin
     },
   });
 
-  await createAuditLog({
-    tenantId,
-    userId,
-    action: 'status_change',
-    entityType: 'waitlist',
-    entityId: entryId,
-    changes: { from: 'waiting', to: 'offered' },
-  });
+  if (userId) {
+    await createAuditLog({
+      tenantId,
+      userId,
+      action: 'status_change',
+      entityType: 'waitlist',
+      entityId: entryId,
+      changes: { from: 'waiting', to: 'offered' },
+    });
+  }
 
   // TODO Phase 5: Send notification to guest
 

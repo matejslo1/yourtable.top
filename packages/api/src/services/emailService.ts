@@ -12,6 +12,7 @@ interface SendEmailParams {
   tenantId?: string;
   reservationId?: string;
   type?: string;
+  templateData?: unknown;
 }
 
 /**
@@ -43,15 +44,29 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
     if (!res.ok) {
       console.error('[Email] Resend error:', data);
       // Log notification as failed
-      if (params.tenantId && params.reservationId) {
-        await logNotification(params.tenantId, params.reservationId, params.type || 'confirmation', params.to, 'failed');
+      if (params.tenantId) {
+        await logNotification(
+          params.tenantId,
+          params.reservationId,
+          params.type || 'confirmation',
+          params.to,
+          'failed',
+          params.templateData
+        );
       }
       return false;
     }
 
     // Log successful notification
-    if (params.tenantId && params.reservationId) {
-      await logNotification(params.tenantId, params.reservationId, params.type || 'confirmation', params.to, 'sent');
+    if (params.tenantId) {
+      await logNotification(
+        params.tenantId,
+        params.reservationId,
+        params.type || 'confirmation',
+        params.to,
+        'sent',
+        params.templateData
+      );
     }
 
     console.log(`[Email] Sent "${params.subject}" to ${params.to}`);
@@ -64,21 +79,23 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
 
 async function logNotification(
   tenantId: string,
-  reservationId: string,
+  reservationId: string | undefined,
   type: string,
   recipient: string,
-  status: 'sent' | 'failed'
+  status: 'sent' | 'failed',
+  templateData?: unknown
 ) {
   try {
     await prisma.notification.create({
       data: {
         tenantId,
-        reservationId,
+        reservationId: reservationId || null,
         type: type as any,
         channel: 'email',
         recipient,
         status: status as any,
         sentAt: status === 'sent' ? new Date() : null,
+        templateData: templateData as any,
       },
     });
   } catch (err) {
@@ -215,31 +232,80 @@ export function reminderEmailHtml(data: {
   partySize: number;
   tenantName: string;
   tenantAddress: string;
+  windowLabel?: string;
 }): string {
   const content = `
-    <h2 style="margin:0 0 8px;font-size:22px;color:#111827;">Opomnik za jutri!</h2>
+    <h2 style="margin:0 0 8px;font-size:22px;color:#111827;">Opomnik za rezervacijo</h2>
     <p style="margin:0 0 24px;color:#6b7280;font-size:14px;">
-      Spo≈°tovani ${data.guestName}, opominjamo vas na jutr≈°njo rezervacijo.
+      Spoötovani ${data.guestName}, opominjamo vas na rezervacijo${data.windowLabel ? ` (${data.windowLabel})` : ''}.
     </p>
     <div style="background:#eff6ff;border-radius:12px;padding:20px;margin-bottom:24px;">
       <table style="width:100%;border-collapse:collapse;">
         <tr>
-          <td style="padding:6px 0;color:#6b7280;font-size:13px;width:100px;">üìÖ Datum</td>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;width:100px;">Datum</td>
           <td style="padding:6px 0;color:#111827;font-size:14px;font-weight:600;">${formatDateSl(data.date)}</td>
         </tr>
         <tr>
-          <td style="padding:6px 0;color:#6b7280;font-size:13px;">üïê ƒåas</td>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;">»as</td>
           <td style="padding:6px 0;color:#111827;font-size:14px;font-weight:600;">${data.time}</td>
         </tr>
         <tr>
-          <td style="padding:6px 0;color:#6b7280;font-size:13px;">üë• Gosti</td>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;">Gosti</td>
           <td style="padding:6px 0;color:#111827;font-size:14px;font-weight:600;">${data.partySize}</td>
         </tr>
       </table>
     </div>
     <div style="background:#f9fafb;border-radius:8px;padding:16px;">
-      <p style="margin:0;font-size:13px;color:#6b7280;">üìç ${data.tenantAddress}</p>
+      <p style="margin:0;font-size:13px;color:#6b7280;">${data.tenantAddress}</p>
     </div>
+  `;
+  return baseTemplate(content, data.tenantName);
+}
+
+export function waitlistOfferEmailHtml(data: {
+  guestName: string;
+  date: string;
+  time: string;
+  partySize: number;
+  tenantName: string;
+}): string {
+  const content = `
+    <h2 style="margin:0 0 8px;font-size:22px;color:#111827;">Prosta miza je na voljo</h2>
+    <p style="margin:0 0 24px;color:#6b7280;font-size:14px;">
+      Pozdravljeni ${data.guestName}, za vaö termin se je sprostila miza.
+    </p>
+    <div style="background:#fffbeb;border-radius:12px;padding:20px;margin-bottom:24px;">
+      <p style="margin:0;color:#111827;font-size:14px;font-weight:600;">
+        ${formatDateSl(data.date)} ob ${data.time} ∑ ${data.partySize} gostov
+      </p>
+      <p style="margin:8px 0 0;color:#92400e;font-size:13px;">
+        Prosimo, potrdite v najkrajöem Ëasu, sicer ponudba poteËe.
+      </p>
+    </div>
+  `;
+  return baseTemplate(content, data.tenantName);
+}
+
+export function reviewRequestEmailHtml(data: {
+  guestName: string;
+  tenantName: string;
+  reviewUrl?: string;
+}): string {
+  const content = `
+    <h2 style="margin:0 0 8px;font-size:22px;color:#111827;">Hvala za obisk</h2>
+    <p style="margin:0 0 18px;color:#6b7280;font-size:14px;">
+      Pozdravljeni ${data.guestName}, veseli bomo vaöe kratke ocene obiska.
+    </p>
+    ${data.reviewUrl ? `
+      <div style="text-align:center;margin:10px 0 20px;">
+        <a href="${data.reviewUrl}" style="display:inline-block;padding:10px 24px;background:#111827;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">
+          Oddaj oceno
+        </a>
+      </div>
+    ` : ''}
+    <p style="margin:0;color:#9ca3af;font-size:13px;">
+      Hvala, ker nam pomagate izboljöati izkuönjo.
+    </p>
   `;
   return baseTemplate(content, data.tenantName);
 }

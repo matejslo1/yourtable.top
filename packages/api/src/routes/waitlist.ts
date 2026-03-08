@@ -1,6 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { requireAuth, requireRole, AuthRequest } from '../middleware/auth.js';
 import { getWaitlist, addToWaitlist, offerSpot, removeFromWaitlist } from '../services/waitlistService.js';
+import { sendWaitlistOfferNotifications } from '../services/notificationService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -32,6 +33,9 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
 router.post('/:id/offer', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const entry = await offerSpot(req.params.id, req.user!.tenantId, req.user!.id);
+    sendWaitlistOfferNotifications(entry.id).catch((err) =>
+      console.error('[Waitlist] Offer notification failed:', err)
+    );
     res.status(200).json({ data: entry });
   } catch (err) { next(err); }
 });

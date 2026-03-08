@@ -30,6 +30,38 @@ interface NavGroup {
   pro?: boolean;
 }
 
+function itemDescription(label: string): string {
+  const map: Record<string, string> = {
+    'Nadzorna plošča': 'Pregled današnjih rezervacij, gostov in ključnih KPI.',
+    'Rezervacije': 'Upravljanje statusov rezervacij in dnevnega poteka.',
+    'Tloris': 'Postavitev miz, zasedenost in live pregled po času.',
+    'Čakalna vrsta': 'Seznam gostov na čakanju in ponujanje prostih mest.',
+    'Gosti': 'CRM profil gostov, zgodovina obiskov in oznake.',
+    'Darilni boni': 'Ustvarjanje, preverjanje in unovčevanje bonov.',
+    'Plačila': 'Pregled plačil, depozitov in stroškov no-show.',
+    'Poročila': 'Analitika zasedenosti, prihodkov in trendov.',
+    'Kampanje': 'Pošiljanje kampanj in ponovno aktiviranje gostov.',
+    'Nastavitve': 'Nastavitve restavracije, delovnega časa in pravil.',
+  };
+  return map[label] || label;
+}
+
+function subDescription(label: string): string {
+  const map: Record<string, string> = {
+    'Live view': 'Prikaz zasedenosti miz v izbranem datumu in času.',
+    'Urejanje miz': 'Dodajanje, premikanje in urejanje parametrov miz.',
+    'Združevanje miz': 'Nastavi povezave miz za večje skupine.',
+    'Pregled dneva': 'Hitri pregled današnje operativne slike.',
+    'Današnje rezervacije': 'Seznam vseh rezervacij za izbrani dan.',
+    'Aktivna čakalna': 'Trenutni gosti, ki čakajo na prosto mizo.',
+    'Seznam': 'Prikaz vseh zapisov v modulu.',
+    'Statusi': 'Hitre akcije za spremembo stanja rezervacije.',
+    'Aktivna': 'Trenutni vnosi v čakalni vrsti.',
+    'Statistika': 'Osnovni KPI in trendi izbranega modula.',
+  };
+  return map[label] || label;
+}
+
 const NAV: NavGroup[] = [
   {
     label: 'Dashboard',
@@ -286,7 +318,13 @@ export function AdminLayout() {
 
                         {!collapsed && (
                           <>
-                            <span className="flex-1 truncate">{item.label}</span>
+                            <span
+                              className="flex-1 truncate yt-tooltip-anchor"
+                              data-tooltip={itemDescription(item.label)}
+                              title={itemDescription(item.label)}
+                            >
+                              {item.label}
+                            </span>
                             {item.soon && <Badge type="soon" />}
                             {item.pro && !item.soon && <Badge type="pro" />}
                             {hasSub && !isDisabled && (
@@ -319,7 +357,13 @@ export function AdminLayout() {
                                   }
                                 `}
                               >
-                                <span className="truncate">{sub.label}</span>
+                                <span
+                                  className="truncate yt-tooltip-anchor"
+                                  data-tooltip={subDescription(sub.label)}
+                                  title={subDescription(sub.label)}
+                                >
+                                  {sub.label}
+                                </span>
                                 {sub.soon && <Badge type="soon" small />}
                                 {sub.pro && <Badge type="pro" small />}
                               </div>
